@@ -41,7 +41,8 @@ filter:
   median_window: 5      # muestras válidas para la mediana
   ema_alpha: 0.4        # peso de la muestra nueva en la media exponencial
   min_quality: 40       # por debajo de este índice (0-255) la muestra se descarta
-  max_jump_m: 1.5       # salto máximo admitido respecto a la muestra anterior
+  max_jump_m: 1.5       # salto máximo admitido respecto a la mediana de las aceptadas
+  max_jump_rejects: 5   # tras estos descartes seguidos por salto, se acepta que el tag se ha movido
 
 display:
   uncertainty_m: 0.20       # radio del círculo de incertidumbre en modo UWB

@@ -47,7 +47,7 @@ La característica lleva 16 bytes en little-endian con los campos en el orden de
 
 ## 2. Log de sesión
 
-Fichero `logs/<fecha>.csv`, con cabecera. Lo escribe el bridge y lo genera también el simulador.
+Fichero `logs/AAAA-MM-DD_HHMMSS.csv`, con cabecera, uno por sesión. Lo escribe el bridge al llegar la primera muestra (nunca en modo replay) y lo genera también el simulador.
 
 ```
 t_host_ms,seq,d_a,d_b,q_a,q_b,t_ms,x,y,zone
@@ -57,8 +57,8 @@ t_host_ms,seq,d_a,d_b,q_a,q_b,t_ms,x,y,zone
 | Columna | Unidad | Descripción |
 | --- | --- | --- |
 | t_host_ms | ms | Hora del Mac al recibir la muestra (epoch) |
-| seq … t_ms | — | El registro crudo, sin filtrar |
-| x, y | m | Posición calculada; vacías si no había posición válida |
+| seq … t_ms | — | El registro crudo, sin filtrar ni corregir con el offset |
+| x, y | m | Posición calculada, también en ciclos con `valid: false`; vacías si no había posición |
 | zone | — | Zona activa; vacía si ninguna |
 
 El replay solo usa `t_host_ms` y las columnas crudas: vuelve a filtrar y a calcular la posición.
@@ -108,20 +108,24 @@ Uno por ciclo recibido.
 | Campo | Unidad | Descripción |
 | --- | --- | --- |
 | x, y | m | Posición filtrada; `null` si todavía no hay posición |
-| d_a, d_b | m | Distancias filtradas, en 3D, tal como las mide la radio; `null` si no hay |
-| r_a, r_b | m | Las mismas distancias proyectadas al plano horizontal; son los radios de los arcos que se dibujan |
+| d_a, d_b | m | Distancias filtradas y corregidas con `offset_cm`, en 3D; `null` si todavía no hay |
+| r_a, r_b | m | Las mismas distancias proyectadas al plano horizontal; son los radios de los arcos que se dibujan. `null` si no hay |
 | q_a, q_b | — | Calidad de la última muestra cruda |
-| rate_hz | Hz | Muestras recibidas por segundo, media del último segundo |
+| rate_hz | Hz | Inverso del intervalo medio entre las muestras del último segundo |
 | latency_ms | ms | Retraso estimado entre el `t_ms` del tag y la recepción en el Mac |
 | lost | — | Ciclos perdidos desde el arranque, según los saltos de `seq` |
 | zone | — | Nombre de la zona que contiene el punto, o `null` |
 | valid | — | `false` si en este ciclo se descartó alguna de las dos distancias |
 
+Cuando el tag deja de enviar, el bridge no publica nada. El dashboard considera que no hay señal tras 1 s sin mensajes `sample`.
+
 ## 4. Estimación de la latencia
 
 El tag y el Mac tienen relojes distintos, así que antes de restar hay que estimar el desfase.
 
-- **Por serie:** el bridge envía `SYNC`, anota la hora de envío `t0` y de respuesta `t1`, y calcula `desfase = (t0 + t1) / 2 − t_ms_tag`. Se repite cada 10 s y se conserva la medida con menor `t1 − t0`.
+- **Por serie:** el bridge envía `SYNC`, anota la hora de envío `t0` y de respuesta `t1`, y calcula `desfase = (t0 + t1) / 2 − t_ms_tag`. Se repite cada 10 s y se conserva la medida con menor `t1 − t0`. Hasta la primera respuesta se usa el método de BLE.
 - **Por BLE y en replay:** no hay canal de vuelta. El desfase se toma como el mínimo de `t_host − t_ms` en los últimos 30 s, de modo que la latencia publicada es el retraso por encima del mejor caso observado.
 
-En ambos casos `latency_ms = t_host − (t_ms + desfase)`.
+En ambos casos `latency_ms = t_host − (t_ms + desfase)`, limitado a 0. Si `t_ms` retrocede, el tag se ha reiniciado: se descartan el desfase, los filtros y la referencia de `seq`.
+
+`latency_ms` mide el transporte hasta el Mac. No incluye el retraso del filtro (unos 350 ms caminando, con los parámetros por defecto) ni el del dibujo.
