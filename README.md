@@ -49,8 +49,11 @@ La geometría de la sala, las zonas y los parámetros del filtro están en [conf
 
 ### Cableado de cada nodo
 
+Guía completa, con los pads del módulo y las comprobaciones antes de encender: [docs/cableado.md](docs/cableado.md).
+
 | DWM3000 | Nano 33 BLE |
 | --- | --- |
+| VDD1 | 3.3V |
 | VDD3V3 | 3.3V (nunca 5 V) |
 | GND | GND |
 | SPICLK | D13 |
