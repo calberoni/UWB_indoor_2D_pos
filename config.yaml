@@ -1,0 +1,59 @@
+# Geometría de la sala y parámetros del bridge.
+#
+# Sistema de coordenadas (metros): ancla A en (0, 0), ancla B en (D, 0).
+# Las dos anclas están en la misma pared, que se dibuja arriba en el plano.
+# El eje y crece hacia el interior de la sala; el tag siempre tiene y >= 0.
+
+anchors:
+  distance_m: 4.00      # D: distancia entre las antenas de A y B, medida con cinta
+  height_m: 1.80        # altura de las dos anclas sobre el suelo
+  offset_cm:            # corrección por ancla; se suma a la distancia medida
+    a: 0.0
+    b: 0.0
+
+tag:
+  height_m: 1.20        # altura a la que se lleva el tag
+
+room:                   # rectángulo que se dibuja en el plano
+  x_min_m: -0.50
+  x_max_m: 4.50
+  y_min_m: 0.00
+  y_max_m: 4.00
+
+zones:                  # rectángulos con nombre; x_m, y_m es la esquina más cercana al origen
+  - name: mesa
+    x_m: 0.30
+    y_m: 1.00
+    width_m: 1.20
+    height_m: 0.80
+  - name: estantería
+    x_m: 3.00
+    y_m: 0.60
+    width_m: 1.00
+    height_m: 0.60
+  - name: puerta
+    x_m: 1.60
+    y_m: 3.20
+    width_m: 1.00
+    height_m: 0.80
+
+filter:
+  median_window: 5      # muestras válidas para la mediana
+  ema_alpha: 0.4        # peso de la muestra nueva en la media exponencial
+  min_quality: 40       # por debajo de este índice (0-255) la muestra se descarta
+  max_jump_m: 1.5       # salto máximo admitido respecto a la muestra anterior
+
+display:
+  uncertainty_m: 0.20       # radio del círculo de incertidumbre en modo UWB
+  wifi_uncertainty_m: 3.00  # radio en modo "simulación WiFi"
+  trail_s: 3.0              # duración de la estela
+
+server:
+  ws_port: 8765
+  http_port: 8000
+
+transport:
+  serial_baud: 115200
+  ble_name: UWB-TAG
+  ble_service_uuid: 76360001-61ff-4c6a-8d40-75579102b404
+  ble_char_uuid: 76360002-61ff-4c6a-8d40-75579102b404

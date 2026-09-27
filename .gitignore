@@ -1,0 +1,24 @@
+# macOS
+.DS_Store
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Firmware
+firmware/build/
+firmware/lib/.cache/
+# El driver de Qorvo no se versiona: lo descarga `make setup`
+firmware/lib/decadriver/
+
+# Sesiones grabadas: solo se versionan los logs de ejemplo
+logs/*.csv
+!logs/ejemplo-*.csv
+
+# Capturas de vídeo del dashboard
+*.webm
+
+# Números de serie de las placas de cada uno
+firmware/nodes.yaml
