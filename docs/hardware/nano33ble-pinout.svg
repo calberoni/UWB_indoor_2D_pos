@@ -1,0 +1,125 @@
+<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 640' width='900' height='640'>
+<rect width='900' height='640' rx='14' fill='#ffffff'/>
+<text x='30' y='42' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='22' font-weight='700' fill='#1f2328'>Arduino Nano 33 BLE · pines usados</text>
+<text x='30' y='64' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' fill='#57606a'>Vista desde arriba, USB arriba · lógica a 3.3 V · en verde, el pad del DWM3000 al que va cada pin</text>
+<rect x='370' y='90' width='160' height='470' rx='10' fill='#0f6e78' stroke='#1f2328' stroke-width='2'/>
+<rect x='420' y='76' width='60' height='34' rx='4' fill='#c9ced6' stroke='#6e7781'/>
+<text x='450' y='98' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='11' font-weight='700' fill='#1f2328' text-anchor='middle'>USB</text>
+<rect x='410' y='450' width='80' height='90' rx='4' fill='#dfe3e8' stroke='#8c959f'/>
+<text x='450' y='500' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='11' fill='#1f2328' text-anchor='middle'>nRF52840</text>
+<circle cx='400' cy='130' r='6' fill='#ffd33d' stroke='#9a6700'/>
+<text x='412' y='134' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='10' fill='#fff'>LED en D13</text>
+<text x='450.0' y='290' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='16' font-weight='700' fill='#fff' text-anchor='middle'>Nano 33 BLE</text>
+<circle cx='382' cy='160' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='370' y1='160' x2='340' y2='160' stroke='#1f6fb2' stroke-width='2'/>
+<rect x='260' y='148.0' width='80' height='24' rx='5' fill='#1f6fb2'/><text x='300.0' y='165' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>D13</text><rect x='257' y='145.0' width='86' height='30' rx='7' fill='none' stroke='#1a7f37' stroke-width='2.5'/>
+<text x='252' y='164' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='11' fill='#57606a' text-anchor='end'>SCK</text>
+<text x='218' y='164' font-family='SFMono-Regular, Menlo, Consolas, monospace' font-size='12' font-weight='700' fill='#1a7f37' text-anchor='end'>20 SPICLK</text>
+<circle cx='382' cy='188' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='370' y1='188' x2='340' y2='188' stroke='#c0392b' stroke-width='2'/>
+<rect x='260' y='176.0' width='80' height='24' rx='5' fill='#c0392b'/><text x='300.0' y='193' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>3.3V</text><rect x='257' y='173.0' width='86' height='30' rx='7' fill='none' stroke='#1a7f37' stroke-width='2.5'/>
+<text x='252' y='192' font-family='SFMono-Regular, Menlo, Consolas, monospace' font-size='12' font-weight='700' fill='#1a7f37' text-anchor='end'>5, 6, 7 VDD1 · VDD3V3</text>
+<circle cx='382' cy='216' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='370' y1='216' x2='340' y2='216' stroke='#9aa3ad' stroke-width='2'/>
+<rect x='260' y='204.0' width='80' height='24' rx='5' fill='#9aa3ad'/><text x='300.0' y='221' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>AREF</text>
+<circle cx='382' cy='244' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='370' y1='244' x2='340' y2='244' stroke='#9aa3ad' stroke-width='2'/>
+<rect x='260' y='232.0' width='80' height='24' rx='5' fill='#9aa3ad'/><text x='300.0' y='249' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>A0</text>
+<circle cx='382' cy='272' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='370' y1='272' x2='340' y2='272' stroke='#9aa3ad' stroke-width='2'/>
+<rect x='260' y='260.0' width='80' height='24' rx='5' fill='#9aa3ad'/><text x='300.0' y='277' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>A1</text>
+<circle cx='382' cy='300' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='370' y1='300' x2='340' y2='300' stroke='#9aa3ad' stroke-width='2'/>
+<rect x='260' y='288.0' width='80' height='24' rx='5' fill='#9aa3ad'/><text x='300.0' y='305' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>A2</text>
+<circle cx='382' cy='328' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='370' y1='328' x2='340' y2='328' stroke='#9aa3ad' stroke-width='2'/>
+<rect x='260' y='316.0' width='80' height='24' rx='5' fill='#9aa3ad'/><text x='300.0' y='333' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>A3</text>
+<circle cx='382' cy='356' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='370' y1='356' x2='340' y2='356' stroke='#9aa3ad' stroke-width='2'/>
+<rect x='260' y='344.0' width='80' height='24' rx='5' fill='#9aa3ad'/><text x='300.0' y='361' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>A4</text>
+<text x='252' y='360' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='11' fill='#57606a' text-anchor='end'>SDA</text>
+<circle cx='382' cy='384' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='370' y1='384' x2='340' y2='384' stroke='#9aa3ad' stroke-width='2'/>
+<rect x='260' y='372.0' width='80' height='24' rx='5' fill='#9aa3ad'/><text x='300.0' y='389' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>A5</text>
+<text x='252' y='388' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='11' fill='#57606a' text-anchor='end'>SCL</text>
+<circle cx='382' cy='412' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='370' y1='412' x2='340' y2='412' stroke='#9aa3ad' stroke-width='2'/>
+<rect x='260' y='400.0' width='80' height='24' rx='5' fill='#9aa3ad'/><text x='300.0' y='417' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>A6</text>
+<circle cx='382' cy='440' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='370' y1='440' x2='340' y2='440' stroke='#9aa3ad' stroke-width='2'/>
+<rect x='260' y='428.0' width='80' height='24' rx='5' fill='#9aa3ad'/><text x='300.0' y='445' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>A7</text>
+<circle cx='382' cy='468' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='370' y1='468' x2='340' y2='468' stroke='#8b0000' stroke-width='2'/>
+<rect x='260' y='456.0' width='80' height='24' rx='5' fill='#8b0000'/><text x='300.0' y='473' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>+5V</text>
+<text x='252' y='472' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='11' fill='#57606a' text-anchor='end'>no usar</text>
+<circle cx='382' cy='496' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='370' y1='496' x2='340' y2='496' stroke='#9aa3ad' stroke-width='2'/>
+<rect x='260' y='484.0' width='80' height='24' rx='5' fill='#9aa3ad'/><text x='300.0' y='501' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>RESET</text>
+<circle cx='382' cy='524' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='370' y1='524' x2='340' y2='524' stroke='#34495e' stroke-width='2'/>
+<rect x='260' y='512.0' width='80' height='24' rx='5' fill='#34495e'/><text x='300.0' y='529' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>GND</text><rect x='257' y='509.0' width='86' height='30' rx='7' fill='none' stroke='#1a7f37' stroke-width='2.5'/>
+<text x='252' y='528' font-family='SFMono-Regular, Menlo, Consolas, monospace' font-size='12' font-weight='700' fill='#1a7f37' text-anchor='end'>8 GND</text>
+<circle cx='382' cy='552' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='370' y1='552' x2='340' y2='552' stroke='#8b0000' stroke-width='2'/>
+<rect x='260' y='540.0' width='80' height='24' rx='5' fill='#8b0000'/><text x='300.0' y='557' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>VIN</text>
+<text x='252' y='556' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='11' fill='#57606a' text-anchor='end'>no usar</text>
+<circle cx='518' cy='160' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='530' y1='160' x2='560' y2='160' stroke='#1f6fb2' stroke-width='2'/>
+<rect x='560' y='148.0' width='80' height='24' rx='5' fill='#1f6fb2'/><text x='600.0' y='165' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>D12</text><rect x='557' y='145.0' width='86' height='30' rx='7' fill='none' stroke='#1a7f37' stroke-width='2.5'/>
+<text x='650' y='164' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='11' fill='#57606a'>MISO</text>
+<text x='692' y='164' font-family='SFMono-Regular, Menlo, Consolas, monospace' font-size='12' font-weight='700' fill='#1a7f37'>19 SPIMISO</text>
+<circle cx='518' cy='188' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='530' y1='188' x2='560' y2='188' stroke='#1f6fb2' stroke-width='2'/>
+<rect x='560' y='176.0' width='80' height='24' rx='5' fill='#1f6fb2'/><text x='600.0' y='193' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>D11</text><rect x='557' y='173.0' width='86' height='30' rx='7' fill='none' stroke='#1a7f37' stroke-width='2.5'/>
+<text x='650' y='192' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='11' fill='#57606a'>MOSI</text>
+<text x='692' y='192' font-family='SFMono-Regular, Menlo, Consolas, monospace' font-size='12' font-weight='700' fill='#1a7f37'>18 SPIMOSI</text>
+<circle cx='518' cy='216' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='530' y1='216' x2='560' y2='216' stroke='#1f6fb2' stroke-width='2'/>
+<rect x='560' y='204.0' width='80' height='24' rx='5' fill='#1f6fb2'/><text x='600.0' y='221' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>D10</text><rect x='557' y='201.0' width='86' height='30' rx='7' fill='none' stroke='#1a7f37' stroke-width='2.5'/>
+<text x='650' y='220' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='11' fill='#57606a'>CS</text>
+<text x='676' y='220' font-family='SFMono-Regular, Menlo, Consolas, monospace' font-size='12' font-weight='700' fill='#1a7f37'>17 SPICSn</text>
+<circle cx='518' cy='244' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='530' y1='244' x2='560' y2='244' stroke='#7b3fa0' stroke-width='2'/>
+<rect x='560' y='232.0' width='80' height='24' rx='5' fill='#7b3fa0'/><text x='600.0' y='249' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>D9</text><rect x='557' y='229.0' width='86' height='30' rx='7' fill='none' stroke='#1a7f37' stroke-width='2.5'/>
+<text x='650' y='248' font-family='SFMono-Regular, Menlo, Consolas, monospace' font-size='12' font-weight='700' fill='#1a7f37'>3 RSTn</text>
+<circle cx='518' cy='272' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='530' y1='272' x2='560' y2='272' stroke='#7b3fa0' stroke-width='2'/>
+<rect x='560' y='260.0' width='80' height='24' rx='5' fill='#7b3fa0'/><text x='600.0' y='277' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>D8</text><rect x='557' y='257.0' width='86' height='30' rx='7' fill='none' stroke='#1a7f37' stroke-width='2.5'/>
+<text x='650' y='276' font-family='SFMono-Regular, Menlo, Consolas, monospace' font-size='12' font-weight='700' fill='#1a7f37'>2 WAKEUP</text>
+<circle cx='518' cy='300' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='530' y1='300' x2='560' y2='300' stroke='#9aa3ad' stroke-width='2'/>
+<rect x='560' y='288.0' width='80' height='24' rx='5' fill='#9aa3ad'/><text x='600.0' y='305' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>D7</text>
+<circle cx='518' cy='328' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='530' y1='328' x2='560' y2='328' stroke='#9aa3ad' stroke-width='2'/>
+<rect x='560' y='316.0' width='80' height='24' rx='5' fill='#9aa3ad'/><text x='600.0' y='333' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>D6</text>
+<circle cx='518' cy='356' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='530' y1='356' x2='560' y2='356' stroke='#9aa3ad' stroke-width='2'/>
+<rect x='560' y='344.0' width='80' height='24' rx='5' fill='#9aa3ad'/><text x='600.0' y='361' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>D5</text>
+<circle cx='518' cy='384' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='530' y1='384' x2='560' y2='384' stroke='#9aa3ad' stroke-width='2'/>
+<rect x='560' y='372.0' width='80' height='24' rx='5' fill='#9aa3ad'/><text x='600.0' y='389' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>D4</text>
+<circle cx='518' cy='412' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='530' y1='412' x2='560' y2='412' stroke='#9aa3ad' stroke-width='2'/>
+<rect x='560' y='400.0' width='80' height='24' rx='5' fill='#9aa3ad'/><text x='600.0' y='417' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>D3</text>
+<circle cx='518' cy='440' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='530' y1='440' x2='560' y2='440' stroke='#d9730d' stroke-width='2'/>
+<rect x='560' y='428.0' width='80' height='24' rx='5' fill='#d9730d'/><text x='600.0' y='445' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>D2</text><rect x='557' y='425.0' width='86' height='30' rx='7' fill='none' stroke='#1a7f37' stroke-width='2.5'/>
+<text x='650' y='444' font-family='SFMono-Regular, Menlo, Consolas, monospace' font-size='12' font-weight='700' fill='#1a7f37'>22 IRQ</text>
+<circle cx='518' cy='468' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='530' y1='468' x2='560' y2='468' stroke='#34495e' stroke-width='2'/>
+<rect x='560' y='456.0' width='80' height='24' rx='5' fill='#34495e'/><text x='600.0' y='473' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>GND</text><rect x='557' y='453.0' width='86' height='30' rx='7' fill='none' stroke='#1a7f37' stroke-width='2.5'/>
+<text x='650' y='472' font-family='SFMono-Regular, Menlo, Consolas, monospace' font-size='12' font-weight='700' fill='#1a7f37'>21 GND</text>
+<circle cx='518' cy='496' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='530' y1='496' x2='560' y2='496' stroke='#9aa3ad' stroke-width='2'/>
+<rect x='560' y='484.0' width='80' height='24' rx='5' fill='#9aa3ad'/><text x='600.0' y='501' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>RESET</text>
+<circle cx='518' cy='524' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='530' y1='524' x2='560' y2='524' stroke='#9aa3ad' stroke-width='2'/>
+<rect x='560' y='512.0' width='80' height='24' rx='5' fill='#9aa3ad'/><text x='600.0' y='529' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>RX</text>
+<circle cx='518' cy='552' r='6' fill='#e6c35c' stroke='#8a6d0b'/>
+<line x1='530' y1='552' x2='560' y2='552' stroke='#9aa3ad' stroke-width='2'/>
+<rect x='560' y='540.0' width='80' height='24' rx='5' fill='#9aa3ad'/><text x='600.0' y='557' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='13' font-weight='600' fill='#fff' text-anchor='middle'>TX</text>
+<rect x='40' y='581' width='14' height='14' rx='3' fill='#c0392b'/><text x='62' y='593' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12.5' fill='#1f2328'>Alimentación 3.3 V</text><rect x='40' y='603' width='14' height='14' rx='3' fill='#8b0000'/><text x='62' y='615' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12.5' fill='#1f2328'>No conectar al DWM3000</text>
+<rect x='260' y='581' width='14' height='14' rx='3' fill='#1f6fb2'/><text x='282' y='593' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12.5' fill='#1f2328'>SPI</text><rect x='260' y='603' width='14' height='14' rx='3' fill='#7b3fa0'/><text x='282' y='615' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12.5' fill='#1f2328'>Control</text>
+<rect x='380' y='581' width='14' height='14' rx='3' fill='#d9730d'/><text x='402' y='593' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12.5' fill='#1f2328'>Interrupción</text><rect x='380' y='603' width='14' height='14' rx='3' fill='#34495e'/><text x='402' y='615' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12.5' fill='#1f2328'>Masa</text>
+<rect x='520' y='581' width='14' height='14' rx='3' fill='#9aa3ad'/><text x='542' y='593' font-family='-apple-system, Segoe UI, Helvetica, Arial, sans-serif' font-size='12.5' fill='#1f2328'>Sin usar</text>
+</svg>

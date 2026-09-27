@@ -39,6 +39,8 @@ Vista desde arriba, con la antena cerámica en el extremo superior. Los pads 1 a
      13 GPIO2   14 GPIO1   15 GPIO0   16 GND
 ```
 
+![Pads del DWM3000](hardware/dwm3000-pinout.svg)
+
 Así lo dibuja la figura 8 del datasheet. Antes de soldar, localiza el pad 1 en tu módulo (o la numeración de tu placa adaptadora) y comprueba que la orientación coincide.
 
 | Pad | Señal | Tipo | Uso en este proyecto |
@@ -89,6 +91,10 @@ Vista desde arriba, con el conector USB arriba. Solo se usan los pines marcados 
               VIN ──┤           ├── TX1
                     └───────────┘
 ```
+
+![Pines del Nano 33 BLE](hardware/nano33ble-pinout.svg)
+
+El LED integrado está en D13, que es el reloj SPI; por eso el firmware señaliza el estado con el LED RGB.
 
 Los nombres de pin están serigrafiados en la placa: si esta figura y la serigrafía no coinciden, manda la serigrafía.
 

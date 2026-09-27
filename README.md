@@ -51,6 +51,11 @@ La geometría de la sala, las zonas y los parámetros del filtro están en [conf
 
 Guía completa, con los pads del módulo y las comprobaciones antes de encender: [docs/cableado.md](docs/cableado.md).
 
+| DWM3000 | Arduino Nano 33 BLE |
+| --- | --- |
+| ![Pads del DWM3000](docs/hardware/dwm3000-pinout.svg) | ![Pines del Nano 33 BLE](docs/hardware/nano33ble-pinout.svg) |
+| Pads 1–8 a la izquierda, 9–16 abajo y 17–24 a la derecha; la antena, arriba | En verde, el pad del DWM3000 al que va cada pin |
+
 | DWM3000 | Nano 33 BLE |
 | --- | --- |
 | VDD1 | 3.3V |
