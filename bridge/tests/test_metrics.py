@@ -2,7 +2,7 @@ import pytest
 
 from uwb_bridge.metrics import LatencyEstimator, LossCounter, RateMeter
 from uwb_bridge.pipeline import Pipeline
-from uwb_bridge.sample import Sample
+from helpers import make_sample
 
 # --- Ciclos perdidos --------------------------------------------------------
 
@@ -71,7 +71,7 @@ def test_resync_keeps_the_count():
 def test_rate_at_steady_10_hz():
     meter = RateMeter()
     rates = [meter.update(1_000_000 + i * 100) for i in range(30)]
-    assert rates[0] == 0.0  # con una sola muestra no hay tasa
+    assert rates[0] is None  # con una sola muestra no hay tasa
     assert all(r == pytest.approx(10.0) for r in rates[1:])
 
 
@@ -96,7 +96,7 @@ def test_rate_only_looks_at_the_last_second():
         meter.update(1_000_000 + i * 100)
     # Cinco segundos de silencio y vuelve a 20 Hz.
     rates = [meter.update(1_007_000 + i * 50) for i in range(30)]
-    assert rates[0] == 0.0
+    assert rates[0] is None
     assert rates[-1] == pytest.approx(20.0)
 
 
@@ -131,7 +131,7 @@ def test_sync_offset_formula():
     # SYNC enviado a t0 = 1000, respuesta a t1 = 1010, el tag dijo 400:
     # desfase = (1000 + 1010) / 2 − 400 = 605.
     estimator.add_sync(1000, 1010, 400)
-    assert estimator.sync_round_trip_ms == 10
+    assert estimator.sync_round_trip_ms(1010) == 10
     # Muestra con t_ms = 500 recibida a t_host = 1130: 1130 − (500 + 605) = 25.
     assert estimator.update(1130, 500) == 25
 
@@ -141,8 +141,27 @@ def test_sync_keeps_measurement_with_shortest_round_trip():
     estimator.add_sync(1000, 1040, 400)  # ida y vuelta 40 ms → desfase 620
     estimator.add_sync(11_000, 11_008, 10_400)  # 8 ms → desfase 604
     estimator.add_sync(21_000, 21_030, 20_400)  # 30 ms: peor, se ignora
-    assert estimator.sync_round_trip_ms == 8
+    assert estimator.sync_round_trip_ms(21_030) == 8
     assert estimator.update(21_130, 20_500) == 21_130 - (20_500 + 604)
+
+
+def test_sync_measurements_older_than_60_s_are_dropped():
+    estimator = LatencyEstimator()
+    estimator.add_sync(1000, 1004, 400)  # la mejor, pero se queda vieja → desfase 602
+    for k in range(1, 8):  # una cada 10 s, peores
+        t0 = 1000 + k * 10_000
+        estimator.add_sync(t0, t0 + 20, t0 - 600 + 10)  # desfase 600
+    assert estimator.sync_round_trip_ms(60_000) == 4
+    assert estimator.sync_round_trip_ms(61_100) == 20
+    assert estimator.update(71_130, 70_500) == 71_130 - (70_500 + 600)
+
+
+def test_without_recent_sync_falls_back_to_the_window_minimum():
+    estimator = LatencyEstimator()
+    estimator.add_sync(1000, 1010, 400)
+    # 70 s después no queda ninguna medida SYNC válida: se usa el mínimo observado.
+    assert estimator.update(71_000 + 30, 70_000) == 0
+    assert estimator.update(71_100 + 45, 70_100) == 15
 
 
 def test_sync_takes_precedence_over_window_minimum():
@@ -161,14 +180,14 @@ def test_latency_is_never_negative():
 def test_sync_with_negative_round_trip_is_ignored():
     estimator = LatencyEstimator()
     estimator.add_sync(1010, 1000, 400)
-    assert estimator.sync_round_trip_ms is None
+    assert estimator.sync_round_trip_ms(1010) is None
 
 
 # --- Reinicio del tag -------------------------------------------------------
 
 
 def _sample(seq, t_ms, t_host_ms, d=3000):
-    return Sample(t_host_ms=t_host_ms, seq=seq, d_a=d, d_b=d, q_a=200, q_b=200, t_ms=t_ms)
+    return make_sample({"a": d, "b": d, "c": d}, seq=seq, t_ms=t_ms, t_host_ms=t_host_ms)
 
 
 def test_tag_restart_does_not_inflate_lost_or_latency(config):
@@ -184,8 +203,28 @@ def test_tag_restart_does_not_inflate_lost_or_latency(config):
         message = pipeline.process(_sample(i, 1_000 + i * 100, host + i * 100 + 15, d=5500)).message
         assert message["lost"] == 0
         assert message["latency_ms"] == 0
-        assert message["valid"] is True
-        assert message["d_a"] == pytest.approx(5.5)
+        assert all(entry["ok"] for entry in message["ranges"].values())
+        # Los filtros empiezan de cero: nada del sitio anterior se mezcla.
+        if i >= 2:
+            assert message["ranges"]["a"]["d"] == pytest.approx(5.5)
+
+
+def test_tag_restart_discards_the_previous_position(config, raw_mm):
+    pipeline = Pipeline(config)
+    p = (2.0, 1.0)  # con A y C, las dos soluciones caen en la sala
+    distances = raw_mm(*p)
+    host = 1_790_000_000_000
+    for i in range(10):
+        message = pipeline.process(make_sample(distances, seq=100 + i, t_ms=50_000 + i * 100, t_host_ms=host + i * 100)).message
+    assert message["x"] is not None
+    # Reinicia y solo llegan A y C. La posición anterior es de hace menos de
+    # max_age_s, pero es de antes del reinicio: no vale para elegir.
+    for i in range(3):
+        message = pipeline.process(
+            make_sample({**distances, "b": -1}, seq=i, t_ms=100 + i * 100, t_host_ms=host + 1_000 + i * 100)
+        ).message
+    assert message["ranges"]["a"]["d"] is not None and message["ranges"]["c"]["d"] is not None
+    assert message["x"] is None and message["anchors_used"] == 0
 
 
 def test_tag_restart_discards_sync_offset(config):
@@ -204,3 +243,9 @@ def test_pipeline_counts_lost_cycles_across_wraparound(config):
     for i, seq in enumerate([65533, 65534, 1, 2]):
         message = pipeline.process(_sample(seq, i * 100, 1_000_000 + i * 100)).message
     assert message["lost"] == 2
+
+
+def test_pipeline_rate_is_null_until_two_samples(config):
+    pipeline = Pipeline(config)
+    assert pipeline.process(_sample(0, 0, 1_000_000)).message["rate_hz"] is None
+    assert pipeline.process(_sample(1, 100, 1_000_100)).message["rate_hz"] == 10.0

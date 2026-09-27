@@ -27,6 +27,10 @@ class MedianEmaFilter:
     contra la última aceptada. Un outlier de algo menos de max_jump_m se acepta
     (de él se ocupa la mediana), y si pasara a ser la referencia haría rechazar
     las muestras buenas que llegan después y aceptar el siguiente outlier.
+
+    Tras un reinicio no hay salida hasta reunir warmup_samples muestras: con
+    una sola, un outlier sería la distancia publicada y quedaría dentro de la
+    media exponencial durante muchos ciclos.
     """
 
     def __init__(
@@ -36,6 +40,7 @@ class MedianEmaFilter:
         min_quality: int = 40,
         max_jump_m: float = 1.5,
         max_jump_rejects: int = 5,
+        warmup_samples: int = 3,
     ) -> None:
         self._window: deque[float] = deque(maxlen=median_window)
         self._jump_rejected: deque[float] = deque(maxlen=median_window)
@@ -43,6 +48,7 @@ class MedianEmaFilter:
         self._min_quality = min_quality
         self._max_jump_m = max_jump_m
         self._max_jump_rejects = max_jump_rejects
+        self._warmup_samples = min(warmup_samples, median_window)
         self._ema: float | None = None
         self._jump_rejects = 0
 
@@ -68,7 +74,10 @@ class MedianEmaFilter:
             # el tag, así que no tocan la cuenta de saltos seguidos.
             return FilterOutput(self._ema, accepted=False)
 
-        if self._window and abs(distance_m - median(self._window)) > self._max_jump_m:
+        warm = len(self._window) >= self._warmup_samples or self._ema is not None
+        # Mientras se calienta no hay referencia fiable para medir saltos: de
+        # un outlier entre las primeras se ocupa la mediana.
+        if warm and abs(distance_m - median(self._window)) > self._max_jump_m:
             if self._jump_rejects < self._max_jump_rejects:
                 self._jump_rejects += 1
                 self._jump_rejected.append(distance_m)
@@ -85,6 +94,8 @@ class MedianEmaFilter:
         self._jump_rejects = 0
         self._jump_rejected.clear()
         self._window.append(distance_m)
+        if self._ema is None and len(self._window) < self._warmup_samples:
+            return FilterOutput(None, accepted=True)
         centre = median(self._window)
         self._ema = centre if self._ema is None else self._alpha * centre + (1 - self._alpha) * self._ema
         return FilterOutput(self._ema, accepted=True)

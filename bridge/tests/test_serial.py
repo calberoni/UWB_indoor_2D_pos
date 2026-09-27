@@ -6,7 +6,7 @@ import time
 
 import pytest
 
-from fake_tag import TAG_CLOCK_OFFSET_MS, FakeTag
+from fake_tag import DISTANCES_MM, QUALITIES, TAG_CLOCK_OFFSET_MS, FakeTag
 from uwb_bridge.transports.serial_link import SerialTransport
 
 
@@ -52,7 +52,7 @@ def test_delivers_samples_and_ignores_the_rest(link):
     seqs = [s.seq for s in samples]
     assert seqs == [(seqs[0] + i) % 65536 for i in range(len(seqs))]  # seguidos, con la vuelta a 0
     assert 0 in seqs
-    assert all((s.d_a, s.d_b, s.q_a, s.q_b) == (2900, 3100, 200, 190) for s in samples)
+    assert all(s.distances_mm == DISTANCES_MM and s.qualities == QUALITIES for s in samples)
     now_ms = time.time() * 1000
     assert all(now_ms - 10_000 < s.t_host_ms <= now_ms for s in samples)
     assert transport.discarded == 3
@@ -142,7 +142,7 @@ def test_partial_first_line_is_not_taken_as_a_record(link):
         try:
             while not tag.sync_requests:  # al llegar el SYNC ya se sabe que el puerto está abierto
                 await asyncio.sleep(0.01)
-            tag.write(b"34,2900,3100,200,190,5000\r\n1235,2900,3100,200,190,5100\r\n")
+            tag.write(b"34,2900,3100,2700,200,190,180,5000\r\n1235,2900,3100,2700,200,190,180,5100\r\n")
             while not samples:
                 await asyncio.sleep(0.01)
             await asyncio.sleep(0.1)

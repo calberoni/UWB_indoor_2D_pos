@@ -22,7 +22,7 @@ CHAR = "76360002-61ff-4c6a-8d40-75579102b404"
 
 
 def payload(seq: int) -> bytearray:
-    return bytearray(struct.pack("<HiiBBI", seq, 2940, 3120, 210, 198, 1000 + seq * 100))
+    return bytearray(struct.pack("<HHHHBBBI", seq, 2940, 3120, 0xFFFF, 210, 198, 0, 1000 + seq * 100))
 
 
 class FakeRadio:
@@ -108,7 +108,8 @@ async def test_notifications_become_samples(monkeypatch):
 
     transport, samples = await run_transport(radio, scenario)
     assert [s.seq for s in samples] == [65534, 65535, 0, 1]
-    assert (samples[0].d_a, samples[0].d_b, samples[0].q_a, samples[0].q_b) == (2940, 3120, 210, 198)
+    assert samples[0].distances_mm == {"a": 2940, "b": 3120, "c": -1}
+    assert samples[0].qualities == {"a": 210, "b": 198, "c": 0}
     assert samples[0].t_ms == 1000 + 65534 * 100
     assert transport.discarded == 2
     assert transport.source == "ble"

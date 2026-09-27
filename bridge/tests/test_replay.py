@@ -6,6 +6,7 @@ import time
 import pytest
 
 import sim
+from helpers import make_sample
 from uwb_bridge.pipeline import Pipeline
 from uwb_bridge.session_log import SessionLog
 from uwb_bridge.transports import TransportError
@@ -30,7 +31,17 @@ def write_static_log(path, config_path, x, y, seed, duration_s=30.0):
 
 
 @pytest.mark.parametrize("seed", [1, 2, 3, 4, 5])
-@pytest.mark.parametrize("x, y", [(2.0, 2.0), (1.0, 2.0), (3.0, 2.0)])
+@pytest.mark.parametrize(
+    "x, y",
+    [
+        (2.0, 2.0),  # centro
+        (1.0, 2.0),
+        (2.0, 0.3),  # junto a la pared de A y B
+        (-0.2, 2.0),  # fuera del triángulo, junto a la pared izquierda
+        (4.2, 3.7),  # esquina fuera del triángulo
+        (2.0, 3.7),  # junto a C
+    ],
+)
 def test_static_tag_stays_within_10_cm(tmp_path, config, config_path, x, y, seed):
     path = tmp_path / "estatico.csv"
     rows = write_static_log(path, config_path, x, y, seed)
@@ -51,20 +62,20 @@ def test_static_tag_stays_within_10_cm(tmp_path, config, config_path, x, y, seed
 def test_static_log_contains_the_disturbances_the_filter_must_survive(tmp_path, config_path, geometry):
     # Si el simulador dejara de meter ruido, el test anterior no probaría nada.
     rows = write_static_log(tmp_path / "estatico.csv", config_path, 2.0, 2.0, seed=1, duration_s=120.0)
-    true_mm = sim.true_distances(geometry, 2.0, 2.0)[0] * 1000
-    distances = [d for row in rows for d in (row["d_a"], row["d_b"])]
+    true_mm = {i: d * 1000 for i, d in sim.true_distances(geometry, 2.0, 2.0).items()}
+    errors = [row[f"d_{i}"] - true_mm[i] if row[f"d_{i}"] != -1 else None for row in rows for i in "abc"]
 
-    failed = sum(d == -1 for d in distances)
-    outliers = sum(d != -1 and abs(d - true_mm) > 500 for d in distances)
+    failed = sum(e is None for e in errors)
+    outliers = sum(e is not None and abs(e) > 500 for e in errors)
     lost = 1200 - len(rows)
-    assert 0.003 < failed / len(distances) < 0.03
-    assert 0.008 < outliers / len(distances) < 0.04
+    assert 0.003 < failed / len(errors) < 0.03
+    assert 0.008 < outliers / len(errors) < 0.04
     assert 0.003 < lost / 1200 < 0.03
 
-    normal = [d for d in distances if d != -1 and abs(d - true_mm) <= 500]
+    normal = [e for e in errors if e is not None and abs(e) <= 500]
     mean = sum(normal) / len(normal)
-    sigma = (sum((d - mean) ** 2 for d in normal) / len(normal)) ** 0.5
-    assert mean == pytest.approx(true_mm, abs=5)
+    sigma = (sum((e - mean) ** 2 for e in normal) / len(normal)) ** 0.5
+    assert mean == pytest.approx(0, abs=5)
     assert sigma == pytest.approx(30, abs=4)
 
 
@@ -98,6 +109,37 @@ def test_simulated_distances_are_3d(config_path, geometry):
     # Tag justo debajo del ancla A: la distancia es la diferencia de altura, no cero.
     assert {row["d_a"] for row in rows} == {600}
     assert {row["d_b"] for row in rows} == {round(math.sqrt(16 + 0.36) * 1000)}
+    assert {row["d_c"] for row in rows} == {round(math.sqrt(4 + 16 + 0.36) * 1000)}
+
+
+def test_simulator_uses_each_anchor_height(tmp_path, config_path):
+    import yaml
+
+    raw = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+    raw["anchors"][2]["z_m"] = 2.7  # C más alta: 1.5 m por encima del tag
+    path = tmp_path / "config.yaml"
+    path.write_text(yaml.safe_dump(raw, allow_unicode=True), encoding="utf-8")
+    options = sim.Options(scenario="static", x_m=2.0, y_m=4.0, sigma_m=0.0, outlier_rate=0, lost_rate=0, fail_rate=0, duration_s=1)
+    rows = sim.generate(options, sim.load_geometry(path))
+    assert {row["d_c"] for row in rows} == {1500}
+    assert {row["d_a"] for row in rows} == {round(math.sqrt(4 + 16 + 0.36) * 1000)}
+
+
+@pytest.mark.parametrize("anchor", ["a", "b", "c"])
+def test_obstruction_biases_one_anchor_with_low_quality(geometry, anchor):
+    options = sim.Options(
+        scenario="static", x_m=2.0, y_m=2.0, sigma_m=0.0, outlier_rate=0, lost_rate=0, fail_rate=0,
+        duration_s=4.0, obstructions=(sim.Obstruction(anchor, 1.0, 2.0),),
+    )
+    rows = sim.generate(options, geometry)
+    true_mm = {i: round(d * 1000) for i, d in sim.true_distances(geometry, 2.0, 2.0).items()}
+    covered = [row for row in rows if 1.0 <= (row["t_ms"] - sim.TAG_START_MS) / 1000 < 3.0]
+    assert len(covered) == 20
+    for row in covered:
+        assert 200 <= row[f"d_{anchor}"] - true_mm[anchor] <= 500
+        assert row[f"q_{anchor}"] <= 60
+        for other in set("abc") - {anchor}:
+            assert row[f"d_{other}"] == true_mm[other]
 
 
 @pytest.mark.parametrize("scenario", ["rect", "walk"])
@@ -108,8 +150,7 @@ def test_moving_scenarios_stay_in_the_room_and_cross_zones(config, geometry, sce
     assert config.room.x_min_m <= min(xs) and max(xs) <= config.room.x_max_m
     assert config.room.y_min_m < min(ys) and max(ys) <= config.room.y_max_m
     zones = {row["zone"] for row in rows} - {""}
-    expected = {"mesa", "estantería", "puerta"} if scenario == "walk" else {"mesa", "estantería"}
-    assert zones == expected
+    assert zones == {"mesa", "estantería", "puerta"}
 
 
 def test_rect_scenario_walks_a_3_by_2_rectangle_at_1_mps(geometry):
@@ -150,10 +191,10 @@ def test_replay_speed_factor(tmp_path, config_path):
 def test_replay_follows_gaps_in_the_log(tmp_path):
     path = tmp_path / "hueco.csv"
     path.write_text(
-        "t_host_ms,seq,d_a,d_b,q_a,q_b,t_ms,x,y,zone\n"
-        "1000,0,2900,2900,200,200,0,,,\n"
-        "1100,1,2900,2900,200,200,100,,,\n"
-        "1500,5,2900,2900,200,200,500,,,\n",
+        "t_host_ms,seq,d_a,d_b,d_c,q_a,q_b,q_c,t_ms,x,y,zone\n"
+        "1000,0,2900,2900,2900,200,200,200,0,,,\n"
+        "1100,1,2900,2900,2900,200,200,200,100,,,\n"
+        "1500,5,2900,2900,2900,200,200,200,500,,,\n",
         encoding="utf-8",
     )
     arrivals = []
@@ -174,12 +215,12 @@ def test_replay_delivers_log_timestamps_not_current_time(tmp_path, config_path):
 def test_replay_skips_corrupt_rows(tmp_path):
     path = tmp_path / "sucio.csv"
     path.write_text(
-        "t_host_ms,seq,d_a,d_b,q_a,q_b,t_ms,x,y,zone\n"
-        "1000,0,2900,2900,200,200,0,2.000,2.000,\n"
-        "1100,1,29x0,2900,200,200,100,,,\n"
+        "t_host_ms,seq,d_a,d_b,d_c,q_a,q_b,q_c,t_ms,x,y,zone\n"
+        "1000,0,2900,2900,2900,200,200,200,0,2.000,2.000,\n"
+        "1100,1,29x0,2900,2900,200,200,200,100,,,\n"
         "esto no es una fila\n"
-        "1200,2,2900,2900,200,200\n"
-        "1300,3,-1,2900,0,200,300,,,mesa\n",
+        "1200,2,2900,2900,2900,200,200,200\n"
+        "1300,3,-1,2900,2900,0,200,200,300,,,mesa\n",
         encoding="utf-8",
     )
     transport = ReplayTransport(path, speed=FAST)
@@ -216,7 +257,8 @@ def test_replay_repeats_as_a_tag_restart(tmp_path, config, config_path):
     [
         ("", "cabecera"),
         ("seq,d_a,d_b\n1,2,3\n", "cabecera"),
-        ("t_host_ms,seq,d_a,d_b,q_a,q_b,t_ms,x,y,zone\n", "no contiene muestras"),
+        ("t_host_ms,seq,d_a,d_b,q_a,q_b,t_ms,x,y,zone\n1,2,3,4,5,6,7,,,\n", "faltan d_c, q_c"),
+        ("t_host_ms,seq,d_a,d_b,d_c,q_a,q_b,q_c,t_ms,x,y,zone\n", "no contiene muestras"),
     ],
 )
 def test_replay_rejects_files_that_are_not_logs(tmp_path, content, fragment):
@@ -246,15 +288,20 @@ def test_session_log_follows_the_contract_and_can_be_replayed(tmp_path, config, 
 
     assert log.path.parent == tmp_path / "logs"
     lines = log.path.read_text(encoding="utf-8").splitlines()
-    assert lines[0] == "t_host_ms,seq,d_a,d_b,q_a,q_b,t_ms,x,y,zone"
+    assert lines[0] == "t_host_ms,seq,d_a,d_b,d_c,q_a,q_b,q_c,t_ms,x,y,zone"
     assert len(lines) == len(original) + 1
 
     with log.path.open(newline="", encoding="utf-8") as file:
         rows = list(csv.DictReader(file))
     for row, (sample, result) in zip(rows, original):
-        raw = [int(row[c]) for c in ("t_host_ms", "seq", "d_a", "d_b", "q_a", "q_b", "t_ms")]
-        assert raw == [sample.t_host_ms, sample.seq, sample.d_a, sample.d_b, sample.q_a, sample.q_b, sample.t_ms]
-        assert row["x"] == f"{result.x:.3f}" and row["y"] == f"{result.y:.3f}"
+        assert int(row["t_host_ms"]) == sample.t_host_ms and int(row["seq"]) == sample.seq
+        assert {i: int(row[f"d_{i}"]) for i in "abc"} == sample.distances_mm
+        assert {i: int(row[f"q_{i}"]) for i in "abc"} == sample.qualities
+        assert int(row["t_ms"]) == sample.t_ms
+        if result.x is None:
+            assert row["x"] == row["y"] == ""
+        else:
+            assert row["x"] == f"{result.x:.3f}" and row["y"] == f"{result.y:.3f}"
         assert row["zone"] == (result.zone or "")
     assert {row["zone"] for row in rows} == {"", "mesa", "estantería", "puerta"}
 
@@ -263,26 +310,25 @@ def test_session_log_follows_the_contract_and_can_be_replayed(tmp_path, config, 
     assert [r.message for _, r in again] == [r.message for _, r in original]
 
 
-def test_session_log_leaves_position_empty_until_there_is_one(tmp_path, config):
-    from uwb_bridge.sample import Sample
-
+def test_session_log_leaves_position_empty_until_there_is_one(tmp_path, config, raw_mm):
     pipeline = Pipeline(config)
     log = SessionLog(tmp_path)
-    for seq, d_b in enumerate([-1, -1, 2900]):
-        sample = Sample(t_host_ms=1000 + seq * 100, seq=seq, d_a=2900, d_b=d_b, q_a=200, q_b=200, t_ms=seq * 100)
+    exact = raw_mm(2.0, 2.0)
+    for seq in range(5):
+        # Solo A al principio; con B y C, la posición sale tras el calentamiento.
+        distances = {**exact, "b": -1, "c": -1} if seq < 2 else exact
+        sample = make_sample(distances, seq=seq, t_host_ms=1000 + seq * 100)
         log.write(sample, pipeline.process(sample))
     log.close()
     lines = log.path.read_text(encoding="utf-8").splitlines()
-    assert lines[1] == "1000,0,2900,-1,200,200,0,,,"
-    assert lines[2] == "1100,1,2900,-1,200,200,100,,,"
-    # y = √(2.9² − 0.6² − 2²) = 2.012
-    assert lines[3] == "1200,2,2900,2900,200,200,200,2.000,2.012,"
+    assert lines[1] == f"1000,0,{exact['a']},-1,-1,200,200,200,0,,,"
+    assert lines[2] == f"1100,1,{exact['a']},-1,-1,200,200,200,100,,,"
+    assert lines[3] == f"1200,2,{exact['a']},{exact['b']},{exact['c']},200,200,200,200,,,"
+    assert lines[5] == f"1400,4,{exact['a']},{exact['b']},{exact['c']},200,200,200,400,2.000,2.000,"
 
 
 def test_session_log_never_overwrites(tmp_path, config):
-    from uwb_bridge.sample import Sample
-
-    sample = Sample(t_host_ms=1000, seq=0, d_a=2900, d_b=2900, q_a=200, q_b=200, t_ms=0)
+    sample = make_sample({"a": 2900, "b": 2900, "c": 2900})
     result = Pipeline(config).process(sample)
     paths = []
     for _ in range(3):  # tres sesiones en el mismo segundo

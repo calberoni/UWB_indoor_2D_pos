@@ -7,7 +7,8 @@
 
 #define ROLE_ANCHOR_A 1
 #define ROLE_ANCHOR_B 2
-#define ROLE_TAG      3
+#define ROLE_ANCHOR_C 3
+#define ROLE_TAG      4
 
 // El Makefile fija el rol con -DROLE=...; este valor solo se usa al compilar
 // desde el IDE de Arduino.
@@ -18,6 +19,7 @@
 #define ADDR_TAG      0x0001
 #define ADDR_ANCHOR_A 0x00A1
 #define ADDR_ANCHOR_B 0x00A2
+#define ADDR_ANCHOR_C 0x00A3
 #define PAN_ID        0xDECA
 
 #if ROLE == ROLE_ANCHOR_A
@@ -26,11 +28,14 @@
 #elif ROLE == ROLE_ANCHOR_B
 #define ROLE_NAME "ANCLA_B"
 #define MY_ADDR   ADDR_ANCHOR_B
+#elif ROLE == ROLE_ANCHOR_C
+#define ROLE_NAME "ANCLA_C"
+#define MY_ADDR   ADDR_ANCHOR_C
 #elif ROLE == ROLE_TAG
 #define ROLE_NAME "TAG"
 #define MY_ADDR   ADDR_TAG
 #else
-#error "ROLE debe ser ROLE_ANCHOR_A, ROLE_ANCHOR_B o ROLE_TAG"
+#error "ROLE debe ser ROLE_ANCHOR_A, ROLE_ANCHOR_B, ROLE_ANCHOR_C o ROLE_TAG"
 #endif
 
 // ---------------------------------------------------------------- Pines (Nano 33 BLE)
@@ -61,6 +66,8 @@
 #define ANTENNA_DELAY 16385
 #elif ROLE == ROLE_ANCHOR_B
 #define ANTENNA_DELAY 16385
+#elif ROLE == ROLE_ANCHOR_C
+#define ANTENNA_DELAY 16385
 #else
 #define ANTENNA_DELAY 16385
 #endif
@@ -82,10 +89,11 @@
 // ---------------------------------------------------------------- Ciclo del tag
 
 #define DEFAULT_RATE_HZ 10
-#define MAX_RATE_HZ     30
+// Un ciclo normal con las tres anclas dura unos 25 ms.
+#define MAX_RATE_HZ     20
 
-// Pausa entre el ranging con A y el ranging con B, para que el ancla B haya
-// descartado la última trama de A y vuelva a estar escuchando.
+// Pausa entre el ranging con un ancla y el siguiente, para que la siguiente
+// haya descartado la última trama del intercambio anterior y vuelva a escuchar.
 #define INTER_RANGING_GAP_US 1500UL
 
 // ---------------------------------------------------------------- Índice de calidad

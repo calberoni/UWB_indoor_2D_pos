@@ -18,11 +18,9 @@ from uwb_bridge.config import load_config  # noqa: E402
 # cambia con cada montaje: D y las alturas se miden con cinta en la sala real.
 REFERENCE_CONFIG = """\
 anchors:
-  distance_m: 4.00
-  height_m: 1.80
-  offset_cm:
-    a: 0.0
-    b: 0.0
+  - {id: a, x_m: 0.00, y_m: 0.00, z_m: 1.80, offset_cm: 0.0}
+  - {id: b, x_m: 4.00, y_m: 0.00, z_m: 1.80, offset_cm: 0.0}
+  - {id: c, x_m: 2.00, y_m: 4.00, z_m: 1.80, offset_cm: 0.0}
 tag:
   height_m: 1.20
 room:
@@ -33,12 +31,18 @@ room:
 zones:
   - {name: mesa, x_m: 0.30, y_m: 1.00, width_m: 1.20, height_m: 0.80}
   - {name: estantería, x_m: 3.00, y_m: 0.60, width_m: 1.00, height_m: 0.60}
-  - {name: puerta, x_m: 1.60, y_m: 3.20, width_m: 1.00, height_m: 0.80}
+  - {name: puerta, x_m: 3.20, y_m: 3.00, width_m: 1.00, height_m: 0.80}
 filter:
   median_window: 5
   ema_alpha: 0.4
   min_quality: 40
   max_jump_m: 1.5
+  max_jump_rejects: 5
+positioning:
+  range_sigma_m: 0.05
+  max_residual_m: 0.30
+  max_age_s: 0.5
+  room_margin_m: 0.30
 display:
   uncertainty_m: 0.20
   wifi_uncertainty_m: 3.00
@@ -88,10 +92,9 @@ def free_port():
 
 @pytest.fixture
 def raw_mm(geometry):
-    """Distancias 3D sin ruido, en mm, que mediría el tag en (x, y)."""
+    """Distancias 3D sin ruido, en mm y por ancla, que mediría el tag en (x, y)."""
 
-    def measure(x: float, y: float) -> tuple[int, int]:
-        d_a, d_b = sim.true_distances(geometry, x, y)
-        return round(d_a * 1000), round(d_b * 1000)
+    def measure(x: float, y: float) -> dict[str, int]:
+        return {i: round(d * 1000) for i, d in sim.true_distances(geometry, x, y).items()}
 
     return measure

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Asocia cada placa a su rol por el número de serie USB.
 
-Con las tres placas conectadas a la vez los puertos cambian de nombre, así que
+Con varias placas conectadas a la vez los puertos cambian de nombre, así que
 el rol se guarda junto al número de serie en firmware/nodes.yaml.
 
     nodes.py list                  placas conectadas y su rol
@@ -16,7 +16,7 @@ from pathlib import Path
 import yaml
 from serial.tools import list_ports
 
-ROLES = ("anchor_a", "anchor_b", "tag")
+ROLES = ("anchor_a", "anchor_b", "anchor_c", "tag")
 ARDUINO_VID = 0x2341
 # Nano 33 BLE en modo normal y en modo bootloader.
 NANO33BLE_PIDS = {0x005A, 0x805A, 0x015A, 0x025A}

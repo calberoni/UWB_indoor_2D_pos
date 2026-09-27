@@ -1,3 +1,5 @@
+import itertools
+import math
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -8,9 +10,26 @@ DEFAULT_CONFIG_PATH = REPO_ROOT / "config.yaml"
 DASHBOARD_DIR = REPO_ROOT / "dashboard"
 LOGS_DIR = REPO_ROOT / "logs"
 
+# Anclas que conoce el protocolo del tag, en el orden de sus campos.
+PROTOCOL_ANCHOR_IDS = ("a", "b", "c")
+
+# Separación mínima del ancla más alejada respecto a la recta de las otras dos,
+# como fracción del lado más largo. Por debajo el triángulo es casi una recta y
+# la posición perpendicular a ella queda indeterminada.
+MIN_TRIANGLE_HEIGHT_RATIO = 0.10
+
 
 class ConfigError(Exception):
     pass
+
+
+@dataclass(frozen=True)
+class Anchor:
+    id: str
+    x_m: float
+    y_m: float
+    z_m: float
+    offset_m: float
 
 
 @dataclass(frozen=True)
@@ -40,6 +59,14 @@ class FilterParams:
 
 
 @dataclass(frozen=True)
+class PositioningParams:
+    range_sigma_m: float = 0.05
+    max_residual_m: float = 0.30
+    max_age_s: float = 0.5
+    room_margin_m: float = 0.30
+
+
+@dataclass(frozen=True)
 class Display:
     uncertainty_m: float
     wifi_uncertainty_m: float
@@ -48,14 +75,12 @@ class Display:
 
 @dataclass(frozen=True)
 class Config:
-    anchor_distance_m: float
-    anchor_height_m: float
-    offset_a_m: float
-    offset_b_m: float
+    anchors: tuple[Anchor, ...]
     tag_height_m: float
     room: Room
     zones: tuple[Zone, ...]
     filter: FilterParams
+    positioning: PositioningParams
     display: Display
     ws_port: int
     http_port: int
@@ -64,12 +89,13 @@ class Config:
     ble_service_uuid: str
     ble_char_uuid: str
 
-    @property
-    def height_diff_m(self) -> float:
-        return abs(self.anchor_height_m - self.tag_height_m)
 
+def load_config(path: Path | str = DEFAULT_CONFIG_PATH, protocol_ids: tuple[str, ...] | None = PROTOCOL_ANCHOR_IDS) -> Config:
+    """Lee y valida la configuración.
 
-def load_config(path: Path | str = DEFAULT_CONFIG_PATH) -> Config:
+    Con protocol_ids=None no se exige que las anclas sean las del protocolo del
+    tag; sirve para usar el cálculo con otro número de anclas.
+    """
     path = Path(path)
     try:
         data = yaml.safe_load(path.read_text(encoding="utf-8"))
@@ -81,27 +107,37 @@ def load_config(path: Path | str = DEFAULT_CONFIG_PATH) -> Config:
         raise ConfigError(f"{path} está vacío o no es un mapa")
 
     try:
-        return _build(data)
+        return build_config(data, protocol_ids)
     except KeyError as exc:
         raise ConfigError(f"falta la clave {exc.args[0]!r} en {path}") from exc
-    except (TypeError, ValueError) as exc:
+    except (TypeError, ValueError, AttributeError) as exc:
         raise ConfigError(f"valor no válido en {path}: {exc}") from exc
 
 
-def _build(data: dict) -> Config:
-    anchors = data["anchors"]
-    offsets = anchors.get("offset_cm") or {}
+def build_config(data: dict, protocol_ids: tuple[str, ...] | None = PROTOCOL_ANCHOR_IDS) -> Config:
     flt = data["filter"]
     room = data["room"]
     display = data["display"]
     server = data["server"]
     transport = data["transport"]
+    positioning = data.get("positioning") or {}
+    defaults = PositioningParams()
+
+    raw_anchors = data["anchors"]
+    if not isinstance(raw_anchors, list):
+        raise ValueError("anchors debe ser una lista de anclas con id, x_m, y_m y z_m")
 
     config = Config(
-        anchor_distance_m=float(anchors["distance_m"]),
-        anchor_height_m=float(anchors["height_m"]),
-        offset_a_m=float(offsets.get("a", 0.0)) / 100.0,
-        offset_b_m=float(offsets.get("b", 0.0)) / 100.0,
+        anchors=tuple(
+            Anchor(
+                id=str(a["id"]),
+                x_m=float(a["x_m"]),
+                y_m=float(a["y_m"]),
+                z_m=float(a["z_m"]),
+                offset_m=float(a.get("offset_cm") or 0.0) / 100.0,
+            )
+            for a in raw_anchors
+        ),
         tag_height_m=float(data["tag"]["height_m"]),
         room=Room(
             x_min_m=float(room["x_min_m"]),
@@ -126,6 +162,12 @@ def _build(data: dict) -> Config:
             max_jump_m=float(flt["max_jump_m"]),
             max_jump_rejects=int(flt.get("max_jump_rejects", 5)),
         ),
+        positioning=PositioningParams(
+            range_sigma_m=float(positioning.get("range_sigma_m", defaults.range_sigma_m)),
+            max_residual_m=float(positioning.get("max_residual_m", defaults.max_residual_m)),
+            max_age_s=float(positioning.get("max_age_s", defaults.max_age_s)),
+            room_margin_m=float(positioning.get("room_margin_m", defaults.room_margin_m)),
+        ),
         display=Display(
             uncertainty_m=float(display["uncertainty_m"]),
             wifi_uncertainty_m=float(display["wifi_uncertainty_m"]),
@@ -139,15 +181,50 @@ def _build(data: dict) -> Config:
         ble_char_uuid=str(transport["ble_char_uuid"]),
     )
 
-    if config.anchor_distance_m <= 0:
-        raise ValueError("anchors.distance_m debe ser mayor que 0")
+    _check_anchors(config.anchors, protocol_ids)
     if config.filter.median_window < 1:
         raise ValueError("filter.median_window debe ser al menos 1")
     if not 0 < config.filter.ema_alpha <= 1:
         raise ValueError("filter.ema_alpha debe estar en (0, 1]")
     if config.filter.max_jump_rejects < 1:
         raise ValueError("filter.max_jump_rejects debe ser al menos 1")
+    p = config.positioning
+    if p.range_sigma_m <= 0 or p.max_residual_m <= 0 or p.max_age_s <= 0 or p.room_margin_m < 0:
+        raise ValueError("los parámetros de positioning deben ser positivos")
     return config
+
+
+def _check_anchors(anchors: tuple[Anchor, ...], protocol_ids: tuple[str, ...] | None) -> None:
+    ids = [a.id for a in anchors]
+    if len(set(ids)) != len(ids):
+        repeated = sorted({i for i in ids if ids.count(i) > 1})
+        raise ValueError(f"ids de ancla repetidas: {', '.join(repeated)}")
+    if len(anchors) < 3:
+        raise ValueError(f"hacen falta al menos 3 anclas; hay {len(anchors)}")
+    if protocol_ids is not None and set(ids) != set(protocol_ids):
+        raise ValueError(
+            f"las anclas deben ser {', '.join(protocol_ids)}, las que mide el tag; en la configuración hay {', '.join(ids)}"
+        )
+
+    # El triángulo más ancho que se puede formar con las anclas decide si hay
+    # geometría para posicionar.
+    best_ratio, best_height, longest_side = 0.0, 0.0, 0.0
+    for p, q, r in itertools.combinations(anchors, 3):
+        sides = [math.dist((p.x_m, p.y_m), (q.x_m, q.y_m)), math.dist((q.x_m, q.y_m), (r.x_m, r.y_m)),
+                 math.dist((r.x_m, r.y_m), (p.x_m, p.y_m))]
+        longest = max(sides)
+        if longest == 0:
+            continue
+        area = abs((q.x_m - p.x_m) * (r.y_m - p.y_m) - (r.x_m - p.x_m) * (q.y_m - p.y_m)) / 2
+        height = 2 * area / longest
+        if height / longest > best_ratio:
+            best_ratio, best_height, longest_side = height / longest, height, longest
+    if best_ratio < MIN_TRIANGLE_HEIGHT_RATIO:
+        raise ValueError(
+            f"las anclas están casi alineadas: la más separada queda a {best_height:.2f} m de la recta de las otras "
+            f"(mínimo {MIN_TRIANGLE_HEIGHT_RATIO * max(longest_side, 1e-9):.2f} m, el "
+            f"{MIN_TRIANGLE_HEIGHT_RATIO:.0%} del lado más largo); sin esa separación no se puede posicionar"
+        )
 
 
 def config_message(config: Config, source: str) -> dict:
@@ -155,11 +232,7 @@ def config_message(config: Config, source: str) -> dict:
     return {
         "type": "config",
         "source": source,
-        "anchors": {
-            "a": {"x": 0.0, "y": 0.0},
-            "b": {"x": config.anchor_distance_m, "y": 0.0},
-            "height_m": config.anchor_height_m,
-        },
+        "anchors": [{"id": a.id, "x": a.x_m, "y": a.y_m, "z": a.z_m} for a in config.anchors],
         "tag": {"height_m": config.tag_height_m},
         "room": {
             "x_min_m": config.room.x_min_m,
@@ -168,13 +241,7 @@ def config_message(config: Config, source: str) -> dict:
             "y_max_m": config.room.y_max_m,
         },
         "zones": [
-            {
-                "name": z.name,
-                "x_m": z.x_m,
-                "y_m": z.y_m,
-                "width_m": z.width_m,
-                "height_m": z.height_m,
-            }
+            {"name": z.name, "x_m": z.x_m, "y_m": z.y_m, "width_m": z.width_m, "height_m": z.height_m}
             for z in config.zones
         ],
         "display": {

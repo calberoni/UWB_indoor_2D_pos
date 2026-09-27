@@ -6,6 +6,12 @@ import threading
 import time
 
 TAG_CLOCK_OFFSET_MS = 1_000_000  # el millis() del tag no tiene nada que ver con la hora del Mac
+# d_a, d_b, d_c, q_a, q_b, q_c de todos los registros: un tag quieto en
+# (1.2, 1.4) con la sala de referencia de los tests.
+TAG_POSITION = (1.2, 1.4)
+DISTANCES_MM = {'a': 1939, 'b': 3187, 'c': 2786}
+QUALITIES = {"a": 200, "b": 190, "c": 180}
+RECORD_BODY = ",".join(str(v) for v in (*DISTANCES_MM.values(), *QUALITIES.values()))
 
 
 class FakeTag:
@@ -43,7 +49,7 @@ class FakeTag:
 
     def _emit(self) -> None:
         while not self._stop.is_set():
-            self.write(f"{self._seq},2900,3100,200,190,{self.millis()}\r\n")
+            self.write(f"{self._seq},{RECORD_BODY},{self.millis()}\r\n")
             self._seq = (self._seq + 1) % 65536
             self._stop.wait(self._period_s)
 

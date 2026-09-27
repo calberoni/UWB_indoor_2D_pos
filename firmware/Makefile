@@ -1,7 +1,7 @@
-# Firmware de los tres nodos.
+# Firmware de los cuatro nodos.
 #
-#   make all                      compila los tres perfiles
-#   make tag | anchor_a | anchor_b
+#   make all                      compila los cuatro perfiles
+#   make tag | anchor_a | anchor_b | anchor_c
 #   make flash ROLE=tag [PORT=/dev/cu.usbmodemXXXX]
 #   make test                     pruebas de la aritmética en el Mac
 #
@@ -14,9 +14,10 @@ DRIVER  := lib/decadriver
 BUILD   := build
 PYTHON  := ../.venv/bin/python
 
-ROLES   := anchor_a anchor_b tag
+ROLES   := anchor_a anchor_b anchor_c tag
 DEFINE_anchor_a := ROLE_ANCHOR_A
 DEFINE_anchor_b := ROLE_ANCHOR_B
+DEFINE_anchor_c := ROLE_ANCHOR_C
 DEFINE_tag      := ROLE_TAG
 
 SOURCES := $(wildcard $(SKETCH)/*)

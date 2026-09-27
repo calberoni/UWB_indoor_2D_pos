@@ -1,20 +1,37 @@
+"""Formatos del contrato de datos: línea serie, notificación BLE y fila del log.
+
+Siguen el protocolo del tag, que mide siempre las anclas a, b y c.
+"""
+
 import re
 import struct
 
+from .config import PROTOCOL_ANCHOR_IDS
 from .sample import RANGING_FAILED, Sample
 
-BLE_FORMAT = "<HiiBBI"
+BLE_FORMAT = "<HHHHBBBI"
 BLE_PAYLOAD_SIZE = struct.calcsize(BLE_FORMAT)
+BLE_RANGING_FAILED = 0xFFFF
+MAX_DISTANCE_MM = 65534
 
-LOG_COLUMNS = ("t_host_ms", "seq", "d_a", "d_b", "q_a", "q_b", "t_ms", "x", "y", "zone")
+RAW_COLUMNS = (
+    "seq",
+    *(f"d_{i}" for i in PROTOCOL_ANCHOR_IDS),
+    *(f"q_{i}" for i in PROTOCOL_ANCHOR_IDS),
+    "t_ms",
+)
+LOG_COLUMNS = ("t_host_ms", *RAW_COLUMNS, "x", "y", "zone")
 
+_COUNT = len(PROTOCOL_ANCHOR_IDS)
 # Estricto a propósito: int() aceptaría "1_000", "+5" o dígitos no ASCII, y una
 # línea con ruido podría colarse como registro válido.
-_RECORD_RE = re.compile(r"(\d{1,10}),(-?\d{1,10}),(-?\d{1,10}),(\d{1,10}),(\d{1,10}),(\d{1,10})", re.ASCII)
+_RECORD_RE = re.compile(
+    r"(\d{1,10})" + r",(-?\d{1,10})" * _COUNT + r",(\d{1,10})" * _COUNT + r",(\d{1,10})",
+    re.ASCII,
+)
 _SYNC_RE = re.compile(r"#\s*SYNC\s+(\d{1,10})", re.ASCII)
 _INT_RE = re.compile(r"-?\d{1,15}", re.ASCII)
 
-_INT32_MAX = 2**31 - 1
 _UINT32_MAX = 2**32 - 1
 
 
@@ -52,41 +69,52 @@ def parse_serial_line(line: str | bytes, t_host_ms: int) -> Sample | None:
         return None
     match = _RECORD_RE.fullmatch(text)
     if match is None:
-        raise ParseError(f"línea no reconocida: {text[:60]!r}")
-    seq, d_a, d_b, q_a, q_b, t_ms = (int(g) for g in match.groups())
-    return _checked_sample(t_host_ms, seq, d_a, d_b, q_a, q_b, t_ms)
+        raise ParseError(f"línea no reconocida: {text[:80]!r}")
+    return _checked_sample(t_host_ms, [int(g) for g in match.groups()])
 
 
 def parse_ble_payload(payload: bytes, t_host_ms: int) -> Sample:
     if len(payload) != BLE_PAYLOAD_SIZE:
         raise ParseError(f"payload BLE de {len(payload)} bytes; se esperaban {BLE_PAYLOAD_SIZE}")
-    seq, d_a, d_b, q_a, q_b, t_ms = struct.unpack(BLE_FORMAT, bytes(payload))
-    return _checked_sample(t_host_ms, seq, d_a, d_b, q_a, q_b, t_ms)
+    values = list(struct.unpack(BLE_FORMAT, bytes(payload)))
+    for i in range(1, 1 + _COUNT):
+        if values[i] == BLE_RANGING_FAILED:
+            values[i] = RANGING_FAILED
+    return _checked_sample(t_host_ms, values)
 
 
 def parse_log_row(row: dict) -> Sample:
     """Convierte una fila del log de sesión; solo usa t_host_ms y las columnas crudas."""
     values = []
-    for column in LOG_COLUMNS[:7]:
+    for column in ("t_host_ms", *RAW_COLUMNS):
         text = (row.get(column) or "").strip()
         if _INT_RE.fullmatch(text) is None:
             raise ParseError(f"columna {column} no válida: {text[:20]!r}")
         values.append(int(text))
-    t_host_ms, seq, d_a, d_b, q_a, q_b, t_ms = values
-    if t_host_ms < 0:
-        raise ParseError(f"t_host_ms negativo: {t_host_ms}")
-    return _checked_sample(t_host_ms, seq, d_a, d_b, q_a, q_b, t_ms)
+    if values[0] < 0:
+        raise ParseError(f"t_host_ms negativo: {values[0]}")
+    return _checked_sample(values[0], values[1:])
 
 
-def _checked_sample(t_host_ms: int, seq: int, d_a: int, d_b: int, q_a: int, q_b: int, t_ms: int) -> Sample:
+def _checked_sample(t_host_ms: int, values: list[int]) -> Sample:
+    """values: seq, distancias, calidades y t_ms, en el orden del protocolo."""
+    seq, t_ms = values[0], values[-1]
+    distances = values[1 : 1 + _COUNT]
+    qualities = values[1 + _COUNT : 1 + 2 * _COUNT]
     if not 0 <= seq <= 0xFFFF:
         raise ParseError(f"seq fuera de rango: {seq}")
-    for name, d in (("d_a", d_a), ("d_b", d_b)):
-        if not RANGING_FAILED <= d <= _INT32_MAX:
-            raise ParseError(f"{name} fuera de rango: {d}")
-    for name, q in (("q_a", q_a), ("q_b", q_b)):
+    for anchor, d in zip(PROTOCOL_ANCHOR_IDS, distances):
+        if d != RANGING_FAILED and not 0 <= d <= MAX_DISTANCE_MM:
+            raise ParseError(f"d_{anchor} fuera de rango: {d}")
+    for anchor, q in zip(PROTOCOL_ANCHOR_IDS, qualities):
         if not 0 <= q <= 0xFF:
-            raise ParseError(f"{name} fuera de rango: {q}")
+            raise ParseError(f"q_{anchor} fuera de rango: {q}")
     if not 0 <= t_ms <= _UINT32_MAX:
         raise ParseError(f"t_ms fuera de rango: {t_ms}")
-    return Sample(t_host_ms=t_host_ms, seq=seq, d_a=d_a, d_b=d_b, q_a=q_a, q_b=q_b, t_ms=t_ms)
+    return Sample(
+        t_host_ms=t_host_ms,
+        seq=seq,
+        distances_mm=dict(zip(PROTOCOL_ANCHOR_IDS, distances)),
+        qualities=dict(zip(PROTOCOL_ANCHOR_IDS, qualities)),
+        t_ms=t_ms,
+    )

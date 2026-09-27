@@ -1,15 +1,26 @@
 # Geometría de la sala y parámetros del bridge.
 #
-# Sistema de coordenadas (metros): ancla A en (0, 0), ancla B en (D, 0).
-# Las dos anclas están en la misma pared, que se dibuja arriba en el plano.
-# El eje y crece hacia el interior de la sala; el tag siempre tiene y >= 0.
+# Sistema de coordenadas (metros) en el plano de la sala, visto desde arriba:
+# x hacia la derecha, y hacia el interior. El origen se elige al medir; lo
+# cómodo es ponerlo en la antena del ancla A. El algoritmo está descrito en
+# docs/posicionamiento.md.
 
-anchors:
-  distance_m: 4.00      # D: distancia entre las antenas de A y B, medida con cinta
-  height_m: 1.80        # altura de las dos anclas sobre el suelo
-  offset_cm:            # corrección por ancla; se suma a la distancia medida
-    a: 0.0
-    b: 0.0
+anchors:                # tres anclas que formen un triángulo alrededor de la zona de la demo
+  - id: a
+    x_m: 0.00
+    y_m: 0.00
+    z_m: 1.80           # altura de la antena sobre el suelo
+    offset_cm: 0.0      # corrección de calibración; se suma a la distancia medida
+  - id: b
+    x_m: 4.00
+    y_m: 0.00
+    z_m: 1.80
+    offset_cm: 0.0
+  - id: c
+    x_m: 2.00
+    y_m: 4.00
+    z_m: 1.80
+    offset_cm: 0.0
 
 tag:
   height_m: 1.20        # altura a la que se lleva el tag
@@ -32,8 +43,8 @@ zones:                  # rectángulos con nombre; x_m, y_m es la esquina más c
     width_m: 1.00
     height_m: 0.60
   - name: puerta
-    x_m: 1.60
-    y_m: 3.20
+    x_m: 3.20
+    y_m: 3.00
     width_m: 1.00
     height_m: 0.80
 
@@ -44,8 +55,14 @@ filter:
   max_jump_m: 1.5       # salto máximo admitido respecto a la mediana de las aceptadas
   max_jump_rejects: 5   # tras estos descartes seguidos por salto, se acepta que el tag se ha movido
 
+positioning:            # ver docs/posicionamiento.md
+  range_sigma_m: 0.05   # error típico de una distancia filtrada
+  max_residual_m: 0.30  # por encima, la posición se marca como dudosa
+  max_age_s: 0.5        # antigüedad máxima de una distancia para entrar en el cálculo
+  room_margin_m: 0.30   # margen alrededor de la sala al elegir entre dos soluciones
+
 display:
-  uncertainty_m: 0.20       # radio del círculo de incertidumbre en modo UWB
+  uncertainty_m: 0.20       # radio mínimo del círculo de incertidumbre en modo UWB
   wifi_uncertainty_m: 3.00  # radio en modo "simulación WiFi"
   trail_s: 3.0              # duración de la estela
 

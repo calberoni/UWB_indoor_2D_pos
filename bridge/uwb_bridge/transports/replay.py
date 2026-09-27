@@ -28,7 +28,7 @@ class ReplayTransport(Transport):
         try:
             with self._path.open(newline="", encoding="utf-8") as file:
                 reader = csv.DictReader(file)
-                missing = [c for c in LOG_COLUMNS[:7] if c not in (reader.fieldnames or [])]
+                missing = [c for c in LOG_COLUMNS[:-3] if c not in (reader.fieldnames or [])]
                 if missing:
                     raise TransportError(f"{self._path} no tiene la cabecera de un log: faltan {', '.join(missing)}")
                 samples = []

@@ -47,8 +47,11 @@ void telemetry_send(const Record &record)
         record_pack(&record, payload);
         record_characteristic.writeValue(payload, sizeof(payload));
     }
-    console_printf("%u,%ld,%ld,%u,%u,%lu\n", (unsigned)record.seq, (long)record.d_a,
-                   (long)record.d_b, (unsigned)record.q_a, (unsigned)record.q_b,
+    // El texto lleva -1 para un fallo, como el registro; solo el binario usa 0xFFFF.
+    console_printf("%u,%ld,%ld,%ld,%u,%u,%u,%lu\n", (unsigned)record.seq,
+                   (long)record.distance_mm[0], (long)record.distance_mm[1],
+                   (long)record.distance_mm[2], (unsigned)record.quality[0],
+                   (unsigned)record.quality[1], (unsigned)record.quality[2],
                    (unsigned long)record.t_ms);
 }
 

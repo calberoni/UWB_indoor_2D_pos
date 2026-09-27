@@ -71,7 +71,7 @@
   .led { width: 0.72em; height: 0.72em; border-radius: 50%; background: var(--text-3); flex: none; }
   [data-state="open"] .led, [data-state="ok"] .led { background: var(--good); box-shadow: 0 0 0.7em var(--good); }
   [data-state="connecting"] .led, [data-state="retry"] .led { background: var(--warn); animation: blink 1s steps(2, start) infinite; }
-  [data-state="doubt"] .led, [data-state="nopos"] .led { background: var(--warn); }
+  [data-state="doubt"] .led, [data-state="two"] .led, [data-state="nopos"] .led { background: var(--warn); }
   [data-state="lost"] .led { background: var(--crit); }
   [data-state="mock"] .led { background: var(--anchor-a); }
   @keyframes blink { to { visibility: hidden; } }
@@ -94,17 +94,20 @@
   .unc b { font-size: calc(var(--u) * 1.35); font-weight: 600; }
 
   /* Distancias */
-  .dist { display: grid; gap: calc(var(--u) * 0.9); }
+  .dist { display: grid; gap: calc(var(--u) * 0.75); --big: 3.4; }
   .drow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: calc(var(--u) * 1); align-items: end; }
   .badge {
     align-self: center;
     width: calc(var(--u) * 2.5); height: calc(var(--u) * 2.5);
     display: grid; place-items: center;
     font: 750 calc(var(--u) * 1.6)/1 var(--font-ui); color: #06090c;
+    border: calc(var(--u) * 0.15) solid var(--c); background: var(--c);
   }
-  .drow[data-anchor="a"] .badge { background: var(--anchor-a); }
-  .drow[data-anchor="b"] .badge { background: var(--anchor-b); }
-  .big { font-size: calc(var(--u) * 4.1); font-weight: 600; line-height: 0.95; letter-spacing: -0.03em; white-space: nowrap; margin-top: calc(var(--u) * 0.35); }
+  .drow .label .off { display: none; color: var(--warn); }
+  .drow.off .label .off { display: inline; }
+  .drow.off .badge { background: transparent; color: var(--c); }
+  .drow.off .big, .drow.off .qv { color: var(--text-3); }
+  .big { font-size: calc(var(--u) * var(--big)); font-weight: 600; line-height: 0.95; letter-spacing: -0.03em; white-space: nowrap; margin-top: calc(var(--u) * 0.35); }
   .big .unit { font-size: 0.42em; letter-spacing: 0; margin-left: 0.25em; }
   .qual { width: calc(var(--u) * 6.2); padding-bottom: calc(var(--u) * 0.4); }
   .qual .qv { font-size: calc(var(--u) * 1.7); font-weight: 600; line-height: 1; margin: calc(var(--u) * 0.4) 0; }
@@ -188,40 +191,15 @@
       <div class="unc"><span class="label">Incertidumbre</span><b class="num empty" id="uncValue">--</b></div>
     </section>
 
-    <section class="dist">
-      <div class="drow" data-anchor="a">
-        <div class="badge">A</div>
-        <div>
-          <div class="label">Distancia al ancla A</div>
-          <div class="big num"><span id="dA" class="empty">-.--</span><span class="unit">m</span></div>
-        </div>
-        <div class="qual">
-          <div class="label">Calidad</div>
-          <div class="empty qv num" id="qA">--</div>
-          <div class="bar"><i id="qABar"></i></div>
-        </div>
-      </div>
-      <div class="drow" data-anchor="b">
-        <div class="badge">B</div>
-        <div>
-          <div class="label">Distancia al ancla B</div>
-          <div class="big num"><span id="dB" class="empty">-.--</span><span class="unit">m</span></div>
-        </div>
-        <div class="qual">
-          <div class="label">Calidad</div>
-          <div class="empty qv num" id="qB">--</div>
-          <div class="bar"><i id="qBBar"></i></div>
-        </div>
-      </div>
-    </section>
+    <section class="dist" id="dist" aria-label="Distancias por ancla"></section>
 
     <section class="grid">
       <div class="cell"><div class="label">Tasa</div><div class="v num"><span id="rate" class="empty">-.-</span><span class="unit">Hz</span></div></div>
       <div class="cell"><div class="label">Latencia</div><div class="v num"><span id="latency" class="empty">--</span><span class="unit">ms</span></div></div>
       <div class="cell"><div class="label">Ciclos perdidos</div><div class="empty v num" id="lost">--</div></div>
       <div class="cell"><div class="label">Fuente de datos</div><div class="v txt empty" id="source">--</div></div>
-      <div class="cell minor"><div class="label">Posición x</div><div class="v num"><span id="posX" class="empty">-.--</span><span class="unit">m</span></div></div>
-      <div class="cell minor"><div class="label">Posición y</div><div class="v num"><span id="posY" class="empty">-.--</span><span class="unit">m</span></div></div>
+      <div class="cell"><div class="label">Anclas usadas</div><div class="v num"><span id="used" class="empty">--</span><span class="unit" id="usedOf"></span></div></div>
+      <div class="cell"><div class="label">Error estimado</div><div class="v num"><span id="err" class="empty">--</span><span class="unit" id="errUnit">cm</span></div></div>
     </section>
 
     <footer class="keys" aria-label="Teclas">
@@ -273,14 +251,19 @@
   const C = {
     bg: '#07090c', floor: '#0c1116', text: '#eef2f5', text2: '#a9b5bf', text3: '#6f7c88',
     grid: 'rgba(150,185,215,0.075)', gridMajor: 'rgba(150,185,215,0.17)',
-    border: 'rgba(205,222,236,0.5)', wall: '#dfe8ef', hatch: 'rgba(205,222,236,0.3)',
-    accent: '#35d69b', a: '#4f9ef5', b: '#f28b45', wifi: '#f0609a', warn: '#fab219', crit: '#ef5b5b',
+    border: 'rgba(205,222,236,0.5)', wall: 'rgba(223,232,239,0.85)',
+    accent: '#35d69b', wifi: '#f0609a', warn: '#fab219', crit: '#ef5b5b',
     ink: '#06090c'
   };
 
+  // Color por ancla, en el orden de config. Los tres primeros están comprobados entre sí y frente
+  // al verde del punto y al rosa del modo WiFi, también con daltonismo; los demás son de reserva.
+  const ANCHOR_COLORS = ['#4f9ef5', '#f28b45', '#eef0a0', '#c792ea', '#5fd4e0', '#d0d6dc'];
+  const DEFAULT_IDS = ['a', 'b', 'c'];
+
   const SOURCE_LABELS = { serial: 'USB serie', ble: 'BLE', replay: 'Replay', mock: 'Sintética' };
   const LINK_LABELS = { connecting: 'Conectando…', open: 'Conectado', retry: 'Reconectando…', mock: 'Modo de prueba' };
-  const SIGNAL_LABELS = { ok: 'Recibiendo', doubt: 'Medida dudosa', nopos: 'Sin posición', lost: 'Sin señal' };
+  const SIGNAL_LABELS = { ok: 'Recibiendo', doubt: 'Medida dudosa', two: 'Dudosa · 2 anclas', nopos: 'Sin posición', lost: 'Sin señal' };
 
   // ---------- Utilidades ----------
   const $ = (id) => document.getElementById(id);
@@ -322,6 +305,9 @@
     sampleAt: -Infinity,
     invalidAt: -Infinity,
     hasPosition: false,
+    err: null,
+    used: null,
+    ranges: {},
     zone: null,
     signal: null
   };
@@ -330,6 +316,7 @@
     arcs: state.showArcs ? 1 : 0,
     presence: 1,                            // atenuación del punto sin señal
     doubt: 0,
+    uwbRadius: null,                        // radio UWB suavizado: max(uncertainty_m, err_m)
     zoneHud: 0
   };
   let trail = [];
@@ -371,7 +358,7 @@
     }
   }
   const posTracker = new Tracker();
-  const arcTrackers = { a: new Tracker(), b: new Tracker() };
+  let arcTrackers = {};
 
   // Periodo del ciclo estimado con las llegadas y los saltos de seq; es más estable
   // que el intervalo entre dos llegadas, que lleva el jitter del transporte.
@@ -401,8 +388,11 @@
   }
 
   function applyConfig(cfg) {
-    const a = cfg.anchors && cfg.anchors.a, b = cfg.anchors && cfg.anchors.b, room = cfg.room;
-    const ok = a && b && room && [a.x, a.y, b.x, b.y, room.x_min_m, room.x_max_m, room.y_min_m, room.y_max_m].every(isNum)
+    const room = cfg.room;
+    const anchors = (Array.isArray(cfg.anchors) ? cfg.anchors : [])
+      .filter((a) => a && a.id !== undefined && a.id !== null && isNum(a.x) && isNum(a.y))
+      .map((a, i) => ({ id: String(a.id), name: upper(a.id), x: a.x, y: a.y, color: ANCHOR_COLORS[i % ANCHOR_COLORS.length] }));
+    const ok = anchors.length > 0 && room && [room.x_min_m, room.x_max_m, room.y_min_m, room.y_max_m].every(isNum)
       && room.x_max_m > room.x_min_m && room.y_max_m > room.y_min_m;
     if (!ok) { console.warn('Mensaje config no válido', cfg); return; }
 
@@ -411,13 +401,14 @@
       .filter((z) => z && [z.x_m, z.y_m, z.width_m, z.height_m].every(isNum))
       .map((z) => ({ name: String(z.name), x: z.x_m, y: z.y_m, w: z.width_m, h: z.height_m, level: 0 }));
 
+    const xs = anchors.map((a) => a.x), ys = anchors.map((a) => a.y);
     state.geom = {
-      a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y },
+      anchors,
       room: { x0: room.x_min_m, x1: room.x_max_m, y0: room.y_min_m, y1: room.y_max_m },
       // El encuadre incluye las anclas aunque queden fuera del rectángulo de la sala
       bounds: {
-        x0: Math.min(room.x_min_m, a.x, b.x), x1: Math.max(room.x_max_m, a.x, b.x),
-        y0: Math.min(room.y_min_m, a.y, b.y), y1: Math.max(room.y_max_m, a.y, b.y)
+        x0: Math.min(room.x_min_m, ...xs), x1: Math.max(room.x_max_m, ...xs),
+        y0: Math.min(room.y_min_m, ...ys), y1: Math.max(room.y_max_m, ...ys)
       },
       zones,
       uncertainty: isNum(display.uncertainty_m) ? display.uncertainty_m : 0.2,
@@ -427,8 +418,11 @@
     };
     resetTrail();
     posTracker.reset();
-    arcTrackers.a.reset();
-    arcTrackers.b.reset();
+    arcTrackers = {};
+    for (const a of anchors) arcTrackers[a.id] = new Tracker();
+    state.ranges = {};
+    anim.uwbRadius = null;
+    buildAnchorRows(anchors);
     setText(dom.source, SOURCE_LABELS[state.geom.source] || upper(state.geom.source || '--'));
     dom.source.classList.toggle('empty', !state.geom.source);
     updateModeUi();
@@ -445,8 +439,13 @@
     state.hasPosition = isNum(s.x) && isNum(s.y);
     if (state.hasPosition) posTracker.push(now, [s.x, s.y], dt);
     else { posTracker.reset(); trailBroken = true; }
-    if (isNum(s.r_a)) arcTrackers.a.push(now, [s.r_a], dt); else arcTrackers.a.reset();
-    if (isNum(s.r_b)) arcTrackers.b.push(now, [s.r_b], dt); else arcTrackers.b.reset();
+    state.ranges = s.ranges && typeof s.ranges === 'object' ? s.ranges : {};
+    for (const [id, tracker] of Object.entries(arcTrackers)) {
+      const rg = state.ranges[id];
+      if (rg && isNum(rg.r)) tracker.push(now, [rg.r], dt); else tracker.reset();
+    }
+    state.err = state.hasPosition && isNum(s.err_m) ? s.err_m : null;
+    state.used = isNum(s.anchors_used) ? s.anchors_used : null;
     state.zone = state.hasPosition && typeof s.zone === 'string' && s.zone ? s.zone : null;
 
     updatePanel(s);
@@ -455,7 +454,7 @@
   // ---------- Panel ----------
   const dom = {};
   ['panel', 'rec', 'recText', 'linkRow', 'linkText', 'signalRow', 'signalText', 'btnUwb', 'btnWifi', 'uncValue',
-    'dA', 'dB', 'qA', 'qB', 'qABar', 'qBBar', 'rate', 'latency', 'lost', 'source', 'posX', 'posY',
+    'dist', 'rate', 'latency', 'lost', 'source', 'used', 'usedOf', 'err', 'errUnit',
     'toast', 'toastText', 'toastDetail', 'toastSave', 'toastClose', 'plan', 'stage'].forEach((id) => { dom[id] = $(id); });
 
   function setText(el, text) { if (el.textContent !== text) el.textContent = text; }
@@ -464,18 +463,46 @@
     el.classList.toggle('empty', !isNum(value));
   }
 
+  // Una fila por ancla: distancia 3D y calidad. Con más de tres, las cifras se reducen para que quepan.
+  let anchorRows = {};
+  function buildAnchorRows(anchors) {
+    dom.dist.textContent = '';
+    anchorRows = {};
+    const n = anchors.length;
+    dom.dist.style.setProperty('--big', n <= 3 ? 3.4 : n === 4 ? 2.6 : 2.05);
+    for (const a of anchors) {
+      const row = document.createElement('div');
+      row.className = 'drow';
+      row.style.setProperty('--c', a.color);
+      row.innerHTML = `<div class="badge"></div>
+        <div><div class="label"><span class="nm"></span><span class="off"> · descartada</span></div>
+          <div class="big num"><span class="dv empty">-.--</span><span class="unit">m</span></div></div>
+        <div class="qual"><div class="label">Calidad</div><div class="qv num empty">--</div><div class="bar"><i></i></div></div>`;
+      row.querySelector('.badge').textContent = a.name;
+      row.querySelector('.nm').textContent = `Ancla ${a.name}`;
+      dom.dist.appendChild(row);
+      anchorRows[a.id] = { row, d: row.querySelector('.dv'), q: row.querySelector('.qv'), bar: row.querySelector('.bar i') };
+    }
+    setText(dom.usedOf, `/${n}`);
+  }
+
   function updatePanel(s) {
-    setValue(dom.dA, s.d_a, 2);
-    setValue(dom.dB, s.d_b, 2);
-    setValue(dom.qA, s.q_a, 0);
-    setValue(dom.qB, s.q_b, 0);
-    dom.qABar.style.width = `${isNum(s.q_a) ? clamp(s.q_a / 255, 0, 1) * 100 : 0}%`;
-    dom.qBBar.style.width = `${isNum(s.q_b) ? clamp(s.q_b / 255, 0, 1) * 100 : 0}%`;
+    for (const [id, el] of Object.entries(anchorRows)) {
+      const rg = state.ranges[id] || {};
+      setValue(el.d, rg.d, 2);
+      setValue(el.q, rg.q, 0);
+      el.bar.style.width = `${isNum(rg.q) ? clamp(rg.q / 255, 0, 1) * 100 : 0}%`;
+      el.row.classList.toggle('off', rg.ok === false);
+    }
     setValue(dom.rate, s.rate_hz, 1);
     setValue(dom.latency, s.latency_ms, 0);
     setValue(dom.lost, s.lost, 0);
-    setValue(dom.posX, s.x, 2);
-    setValue(dom.posY, s.y, 2);
+    setValue(dom.used, state.used, 0);
+    const err = state.err;
+    const big = isNum(err) && err >= 1;
+    setValue(dom.err, isNum(err) ? (big ? err : Math.round(err * 100)) : null, big ? 1 : 0);
+    setText(dom.errUnit, big ? 'm' : 'cm');
+    updateModeUi();
   }
 
   function setLink(link) {
@@ -488,7 +515,7 @@
     let signal = 'ok';
     if (!state.sample || now - state.sampleAt > SIGNAL_TIMEOUT_MS) signal = 'lost';
     else if (!state.hasPosition) signal = 'nopos';
-    else if (now - state.invalidAt < DOUBT_HOLD_MS) signal = 'doubt';
+    else if (now - state.invalidAt < DOUBT_HOLD_MS) signal = state.used === 2 ? 'two' : 'doubt';
     if (signal === state.signal) return;
     state.signal = signal;
     dom.signalRow.dataset.state = signal;
@@ -501,8 +528,14 @@
     dom.btnUwb.setAttribute('aria-pressed', String(!wifi));
     dom.btnWifi.setAttribute('aria-pressed', String(wifi));
     const g = state.geom;
-    setText(dom.uncValue, fmtUncertainty(g ? (wifi ? g.wifiUncertainty : g.uncertainty) : null));
+    setText(dom.uncValue, fmtUncertainty(g ? (wifi ? g.wifiUncertainty : uwbTarget()) : null));
     dom.uncValue.classList.toggle('empty', !g);
+  }
+
+  // Radio del círculo en modo UWB: el error estimado, con el mínimo de configuración
+  function uwbTarget() {
+    const g = state.geom;
+    return isNum(state.err) ? Math.max(g.uncertainty, state.err) : g.uncertainty;
   }
 
   function setMode(mode) {
@@ -572,10 +605,28 @@
     draw(performance.now());
   }
 
+  const WALL_TOL_M = 0.15;   // un ancla a menos de esto de una pared se considera en la pared
   function computeView() {
     const g = state.geom;
     if (!g) { view = null; return; }
-    const margin = { l: 3.4 * u, r: 1.8 * u, t: 4.9 * u, b: 7.3 * u };
+    const box = 2.2 * u, gap = 0.7 * u;
+    // Cada ancla lleva su distintivo hacia fuera de la pared en la que está, o en diagonal si está
+    // en una esquina; las del interior lo llevan arriba a la derecha.
+    const marks = g.anchors.map((a) => {
+      const dx = (a.x >= g.room.x1 - WALL_TOL_M ? 1 : 0) - (a.x <= g.room.x0 + WALL_TOL_M ? 1 : 0);
+      const dy = (a.y >= g.room.y1 - WALL_TOL_M ? 1 : 0) - (a.y <= g.room.y0 + WALL_TOL_M ? 1 : 0);
+      const w = Math.max(box, textWidth(a.name, 1.5 * u, { weight: 750 }) + 0.9 * u);
+      return { a, dx, dy, w, h: box };
+    });
+    const side = (fn) => marks.filter(fn).reduce((m, k) => Math.max(m, k.w), 0);
+    const leftW = side((k) => k.dx < 0), rightW = side((k) => k.dx > 0);
+    const anyTop = marks.some((k) => k.dy < 0), anyBottom = marks.some((k) => k.dy > 0);
+    const margin = {
+      l: Math.max(3.4 * u, leftW ? gap + leftW + 0.8 * u : 0),
+      r: rightW ? gap + rightW + 1 * u : 1.8 * u,
+      t: anyTop ? gap + box + 1 * u : 1.6 * u,
+      b: anyBottom ? 8.4 * u : 7.3 * u
+    };
     const bw = g.bounds.x1 - g.bounds.x0, bh = g.bounds.y1 - g.bounds.y0;
     const availW = Math.max(10, width - margin.l - margin.r);
     const availH = Math.max(10, height - margin.t - margin.b);
@@ -583,13 +634,28 @@
     view = {
       scale,
       ox: margin.l + (availW - bw * scale) / 2,
-      oy: margin.t + (availH - bh * scale) / 2
+      oy: margin.t + (availH - bh * scale) / 2,
+      hudGap: anyBottom ? 3.65 * u : 2.55 * u
     };
     // Rectángulo de la sala en pantalla
     view.x = sx(g.room.x0);
     view.y = sy(g.room.y0);
     view.w = (g.room.x1 - g.room.x0) * scale;
     view.h = (g.room.y1 - g.room.y0) * scale;
+    view.badges = marks.map((k) => {
+      const px = sx(k.a.x), py = sy(k.a.y);
+      let cx, cy;
+      if (k.dx === 0 && k.dy === 0) { cx = px + 0.6 * u + k.w / 2; cy = py - 0.6 * u - k.h / 2; }
+      else {
+        cx = px + k.dx * (gap + k.w / 2);
+        cy = py + k.dy * (gap + k.h / 2);
+      }
+      return { anchor: k.a, px, py, x: cx - k.w / 2, y: cy - k.h / 2, w: k.w, h: k.h };
+    });
+  }
+  function hitsBadge(x, y, w, h) {
+    const pad = 0.3 * u;
+    return view.badges.some((b) => x < b.x + b.w + pad && x + w > b.x - pad && y < b.y + b.h + pad && y + h > b.y - pad);
   }
   const sx = (x) => view.ox + (x - state.geom.bounds.x0) * view.scale;
   const sy = (y) => view.oy + (y - state.geom.bounds.y0) * view.scale;
@@ -684,30 +750,9 @@
   }
 
   function drawFrame() {
-    const wallH = 0.7 * u;
-    // Pared de las anclas: banda rayada sobre el borde superior
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(view.x, view.y - wallH, view.w, wallH);
-    ctx.clip();
-    ctx.strokeStyle = C.hatch;
-    ctx.lineWidth = Math.max(1, 0.06 * u);
-    ctx.beginPath();
-    for (let x = view.x - wallH; x < view.x + view.w + wallH; x += 0.5 * u) {
-      ctx.moveTo(x, view.y); ctx.lineTo(x + wallH, view.y - wallH);
-    }
-    ctx.stroke();
-    ctx.restore();
-
-    ctx.strokeStyle = C.border;
-    ctx.lineWidth = Math.max(1, 0.07 * u);
-    ctx.strokeRect(crisp(view.x), crisp(view.y), view.w, view.h);
-
     ctx.strokeStyle = C.wall;
-    ctx.lineWidth = 0.16 * u;
-    ctx.beginPath();
-    ctx.moveTo(view.x, view.y); ctx.lineTo(view.x + view.w, view.y);
-    ctx.stroke();
+    ctx.lineWidth = 0.13 * u;
+    ctx.strokeRect(view.x, view.y, view.w, view.h);
   }
 
   function niceStep(pxPerM, minPx) {
@@ -729,91 +774,94 @@
       const x = crisp(sx(i * step));
       ctx.moveTo(x, bottom); ctx.lineTo(x, bottom + tick);
       const text = String(i * step);
+      const tw = textWidth(text, size, { num: true, weight: 500 });
+      // Las etiquetas que quedarían bajo el distintivo de un ancla se omiten
+      if (hitsBadge(x - tw / 2, bottom + 0.65 * u, tw, size)) continue;
       drawText(text, x, bottom + 0.65 * u, size, C.text2, { align: 'center', baseline: 'top', num: true, weight: 500 });
       // La unidad se aparta si la primera etiqueta cae sobre la esquina
-      unitX = Math.min(unitX, x - textWidth(text, size, { num: true, weight: 500 }) / 2 - 0.6 * u);
+      unitX = Math.min(unitX, x - tw / 2 - 0.6 * u);
     }
     for (let j = Math.ceil(g.room.y0 / step - eps); j <= Math.floor(g.room.y1 / step + eps); j++) {
       const y = crisp(sy(j * step));
       ctx.moveTo(view.x, y); ctx.lineTo(view.x - tick, y);
-      drawText(String(j * step), view.x - 0.7 * u, y, size, C.text2, { align: 'right', baseline: 'middle', num: true, weight: 500 });
+      const text = String(j * step);
+      const tw = textWidth(text, size, { num: true, weight: 500 });
+      if (hitsBadge(view.x - 0.7 * u - tw, y - size / 2, tw, size)) continue;
+      drawText(text, view.x - 0.7 * u, y, size, C.text2, { align: 'right', baseline: 'middle', num: true, weight: 500 });
     }
     ctx.stroke();
     // Unidad común a los dos ejes, en la esquina donde se encuentran
-    drawText('m', unitX, bottom + 0.65 * u, size, C.text3, { align: 'right', baseline: 'top', weight: 500 });
+    if (!hitsBadge(unitX - size, bottom + 0.65 * u, size, size)) {
+      drawText('m', unitX, bottom + 0.65 * u, size, C.text3, { align: 'right', baseline: 'top', weight: 500 });
+    }
   }
 
   function drawAnchors() {
-    const g = state.geom;
-    const wallH = 0.7 * u, box = 2.2 * u;
-    const boxBottom = view.y - wallH - 0.7 * u;
-    const cy = boxBottom - box / 2;
-    const ax = sx(g.a.x), bx = sx(g.b.x);
-
-    // Cota entre las dos anclas
-    const left = Math.min(ax, bx) + box / 2 + 0.6 * u, right = Math.max(ax, bx) - box / 2 - 0.6 * u;
-    if (right - left > 8 * u) {
-      const dist = Math.hypot(g.b.x - g.a.x, g.b.y - g.a.y);
-      const text = `${dist.toFixed(2)} m`;
-      const tw = textWidth(text, 1.05 * u, { num: true, weight: 500 }) + 1.2 * u;
-      const mid = (left + right) / 2, y = crisp(cy);
-      ctx.strokeStyle = C.text3;
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(left, y); ctx.lineTo(mid - tw / 2, y);
-      ctx.moveTo(mid + tw / 2, y); ctx.lineTo(right, y);
-      ctx.moveTo(crisp(left), y - 0.4 * u); ctx.lineTo(crisp(left), y + 0.4 * u);
-      ctx.moveTo(crisp(right), y - 0.4 * u); ctx.lineTo(crisp(right), y + 0.4 * u);
-      ctx.stroke();
-      drawText(text, mid, cy, 1.05 * u, C.text2, { align: 'center', baseline: 'middle', num: true, weight: 500 });
-    }
-
-    for (const [name, p, color] of [['A', g.a, C.a], ['B', g.b, C.b]]) {
-      const x = sx(p.x), y = sy(p.y);
+    for (const b of view.badges) {
+      const color = b.anchor.color;
+      const rg = state.ranges[b.anchor.id];
+      const off = state.sample && rg && rg.ok === false && state.signal !== 'lost';
+      // Conector entre la marca y el distintivo
+      const cx = b.x + b.w / 2, cy = b.y + b.h / 2;
+      const dx = cx - b.px, dy = cy - b.py;
+      const tx = Math.abs(dx) > 1e-6 ? (b.w / 2) / Math.abs(dx) : Infinity;
+      const ty = Math.abs(dy) > 1e-6 ? (b.h / 2) / Math.abs(dy) : Infinity;
+      const edge = 1 - Math.min(tx, ty, 1);
       ctx.strokeStyle = color;
       ctx.lineWidth = 0.12 * u;
       ctx.beginPath();
-      ctx.moveTo(x, boxBottom); ctx.lineTo(x, y);
+      ctx.moveTo(b.px, b.py); ctx.lineTo(b.px + dx * edge, b.py + dy * edge);
       ctx.stroke();
-      // Marca del ancla sobre la pared
+      // Marca del ancla en su posición
       const r = 0.5 * u;
       ctx.fillStyle = color;
       ctx.strokeStyle = C.bg;
       ctx.lineWidth = 0.14 * u;
       ctx.beginPath();
-      ctx.moveTo(x - r, y); ctx.lineTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r);
+      ctx.moveTo(b.px - r, b.py); ctx.lineTo(b.px, b.py - r); ctx.lineTo(b.px + r, b.py); ctx.lineTo(b.px, b.py + r);
       ctx.closePath();
       ctx.fill(); ctx.stroke();
-
-      ctx.fillStyle = color;
-      ctx.fillRect(x - box / 2, boxBottom - box, box, box);
-      drawText(name, x, cy + 0.04 * u, 1.5 * u, C.ink, { align: 'center', baseline: 'middle', weight: 750 });
+      // Distintivo: relleno si la medida de este ciclo se aceptó, hueco si se descartó
+      if (off) {
+        ctx.fillStyle = C.bg;
+        ctx.fillRect(b.x, b.y, b.w, b.h);
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 0.16 * u;
+        ctx.strokeRect(b.x + 0.08 * u, b.y + 0.08 * u, b.w - 0.16 * u, b.h - 0.16 * u);
+      } else {
+        ctx.fillStyle = color;
+        ctx.fillRect(b.x, b.y, b.w, b.h);
+      }
+      drawText(b.anchor.name, cx, cy + 0.04 * u, 1.5 * u, off ? color : C.ink, { align: 'center', baseline: 'middle', weight: 750 });
     }
   }
 
   // ---------- Dibujo: capa viva ----------
   function drawArcs(p) {
-    const g = state.geom;
     const alpha = anim.arcs * anim.presence;
     if (alpha < 0.01) return;
     ctx.save();
     clipRoom();
-    for (const [key, anchor, color] of [['a', g.a, C.a], ['b', g.b, C.b]]) {
-      const tracker = arcTrackers[key];
-      if (!tracker.p) continue;
+    for (const anchor of state.geom.anchors) {
+      const tracker = arcTrackers[anchor.id];
+      if (!tracker || !tracker.p) continue;
+      const rg = state.ranges[anchor.id];
+      // Un ancla descartada en este ciclo se dibuja discontinua y más tenue
+      const off = rg && rg.ok === false;
+      const k = off ? 0.45 : 1;
       const r = Math.max(0, tracker.at(frameTime)[0]) * view.scale;
       const cx = sx(anchor.x), cy = sy(anchor.y);
-      ctx.strokeStyle = rgba(color, 0.62 * alpha);
+      ctx.strokeStyle = rgba(anchor.color, 0.62 * alpha * k);
       ctx.lineWidth = 0.12 * u;
-      ctx.setLineDash([]);
+      ctx.setLineDash(off ? [0.9 * u, 0.6 * u] : []);
       ctx.beginPath();
       ctx.arc(cx, cy, r, 0, TAU);
       ctx.stroke();
-      if (p && r > 1) {
+      if (p && r > 1 && !off) {
         // Radio desde el ancla hacia el punto, con la longitud medida
         const dx = sx(p[0]) - cx, dy = sy(p[1]) - cy, d = Math.hypot(dx, dy);
         if (d > 1) {
-          ctx.strokeStyle = rgba(color, 0.3 * alpha);
+          ctx.strokeStyle = rgba(anchor.color, 0.3 * alpha);
           ctx.lineWidth = 0.07 * u;
           ctx.setLineDash([0.45 * u, 0.45 * u]);
           ctx.beginPath();
@@ -861,7 +909,7 @@
     const g = state.geom;
     const x = sx(p[0]), y = sy(p[1]);
     const e = easeInOut(anim.mode);
-    const radius = lerp(g.uncertainty, g.wifiUncertainty, e) * view.scale;
+    const radius = lerp(anim.uwbRadius ?? g.uncertainty, g.wifiUncertainty, e) * view.scale;
     const doubt = anim.doubt, presence = anim.presence;
     const ringColor = doubt > 0.5 ? C.warn : null;
 
@@ -896,7 +944,7 @@
     // Rótulo junto al punto
     const lost = state.signal === 'lost';
     if (lost || doubt > 0.5) {
-      const text = lost ? 'SIN SEÑAL' : 'DUDOSO';
+      const text = lost ? 'SIN SEÑAL' : state.used === 2 ? 'DUDOSO · 2 ANCLAS' : 'DUDOSO';
       const size = 0.95 * u, padX = 0.5 * u, h = 1.6 * u;
       const tw = textWidth(text, size, { spacing: 0.1, weight: 700 }) + 2 * padX;
       let bx = x + 1.1 * u, by = y - 1.1 * u - h;
@@ -910,7 +958,7 @@
 
   function drawHud() {
     const g = state.geom;
-    const top = view.y + view.h + 2.55 * u;
+    const top = view.y + view.h + view.hudGap;
     const capSize = 0.8 * u;
     const mid = top + capSize + 2.3 * u;
     const cap = (text, x, align) => drawText(text, x, top, capSize, C.text3, { baseline: 'top', spacing: 0.13, align });
@@ -944,7 +992,7 @@
     ctx.fillStyle = wifi ? C.wifi : C.accent;
     ctx.fillRect(mx, mid - tagH / 2, tagW, tagH);
     drawText(tag, mx + 0.7 * u, mid + 0.04 * u, tagSize, C.ink, { baseline: 'middle', spacing: 0.08, weight: 750 });
-    const unc = fmtUncertainty(wifi ? g.wifiUncertainty : g.uncertainty);
+    const unc = fmtUncertainty(wifi ? g.wifiUncertainty : uwbTarget());
     drawText(unc, mx + tagW + 0.8 * u, mid + 0.04 * u, 1.5 * u, C.text, { baseline: 'middle', num: true, weight: 600 });
     const modeEnd = mx + tagW + 0.8 * u + textWidth(unc, 1.5 * u, { num: true, weight: 600 });
 
@@ -1005,6 +1053,10 @@
     ctx.fillStyle = C.bg;
     ctx.fillRect(0, 0, width, height);
     if (!state.geom || !view) { drawWaiting(); return; }
+
+    // El radio UWB sigue al error estimado sin saltos
+    const target = uwbTarget();
+    anim.uwbRadius = anim.uwbRadius === null ? target : anim.uwbRadius + (target - anim.uwbRadius) * (1 - Math.exp(-dt / 180));
 
     for (const z of state.geom.zones) z.level = approach(z.level, z.name === activeZone ? 1 : 0, 1 / 180, dt);
 
@@ -1120,20 +1172,29 @@
   // ---------- Modo de prueba ----------
   // Genera un config y un paseo sintético a 10 Hz, y los entrega como texto JSON
   // por el mismo camino que los mensajes del bridge.
+  const MOCK_LAYOUTS = {
+    // La geometría de config.yaml
+    default: [['a', 0.0, 0.0], ['b', 4.0, 0.0], ['c', 2.0, 4.0]],
+    corners: [['a', -0.5, 0.0], ['b', 4.5, 0.0], ['c', -0.5, 4.0]],
+    four: [['a', -0.5, 0.0], ['b', 4.5, 0.0], ['c', -0.5, 4.0], ['d', 4.5, 4.0]],
+    five: [['a', -0.5, 0.0], ['b', 4.5, 0.0], ['c', -0.5, 4.0], ['d', 4.5, 4.0], ['e', 2.0, 2.2]]
+  };
+
   function startMock() {
+    const layout = MOCK_LAYOUTS[params.get('layout')] || MOCK_LAYOUTS.default;
     const config = {
       type: 'config', source: 'mock',
-      anchors: { a: { x: 0.0, y: 0.0 }, b: { x: 4.0, y: 0.0 }, height_m: 1.8 },
+      anchors: layout.map(([id, x, y]) => ({ id, x, y, z: 1.8 })),
       tag: { height_m: 1.2 },
       room: { x_min_m: -0.5, x_max_m: 4.5, y_min_m: 0.0, y_max_m: 4.0 },
       zones: [
         { name: 'mesa', x_m: 0.3, y_m: 1.0, width_m: 1.2, height_m: 0.8 },
         { name: 'estantería', x_m: 3.0, y_m: 0.6, width_m: 1.0, height_m: 0.6 },
-        { name: 'puerta', x_m: 1.6, y_m: 3.2, width_m: 1.0, height_m: 0.8 }
+        { name: 'puerta', x_m: 3.2, y_m: 3.0, width_m: 1.0, height_m: 0.8 }
       ],
       display: { uncertainty_m: 0.2, wifi_uncertainty_m: 3.0, trail_s: 3.0 }
     };
-    const waypoints = [[0.9, 1.4], [0.75, 2.75], [2.1, 3.6], [3.55, 2.9], [3.5, 0.9], [2.1, 0.75]];
+    const waypoints = [[0.9, 1.4], [0.9, 2.8], [2.0, 3.2], [3.7, 3.4], [3.7, 2.1], [3.5, 0.9], [2.1, 0.8]];
 
     // Curva cerrada de Catmull-Rom por los puntos de paso, tabulada por longitud
     const path = [];
@@ -1171,12 +1232,35 @@
     };
     const gauss = () => Math.sqrt(-2 * Math.log(1 - rand())) * Math.cos(TAU * rand());
 
-    const dh = config.anchors.height_m - config.tag.height_m;
-    const span = config.anchors.b.x - config.anchors.a.x;
-    const filtered = { a: null, b: null };
+    // Mínimos cuadrados por Gauss-Newton y error estimado por HDOP, como en docs/posicionamiento.md
+    function solve(used, start) {
+      let p = start.slice();
+      let JtJ = null, rms = 0;
+      for (let it = 0; it < 6; it++) {
+        let a11 = 0, a12 = 0, a22 = 0, b1 = 0, b2 = 0, ss = 0;
+        for (const { x, y, r } of used) {
+          const dx = p[0] - x, dy = p[1] - y, d = Math.max(1e-6, Math.hypot(dx, dy));
+          const ux = dx / d, uy = dy / d, res = d - r;
+          a11 += ux * ux; a12 += ux * uy; a22 += uy * uy; b1 += ux * res; b2 += uy * res; ss += res * res;
+        }
+        const det = a11 * a22 - a12 * a12;
+        JtJ = { a11, a12, a22, det };
+        rms = Math.sqrt(ss / used.length);
+        if (Math.abs(det) < 1e-9) break;
+        const sx0 = -(a22 * b1 - a12 * b2) / det, sy0 = -(a11 * b2 - a12 * b1) / det;
+        p = [p[0] + sx0, p[1] + sy0];
+        if (Math.hypot(sx0, sy0) < 1e-3) break;
+      }
+      const hdop = JtJ && Math.abs(JtJ.det) > 1e-9 ? Math.sqrt((JtJ.a11 + JtJ.a22) / JtJ.det) : 10;
+      return { p, err: Math.min(9.99, hdop * Math.max(0.05, rms)), rms };
+    }
+
+    const dh = 1.8 - config.tag.height_m;
+    const filtered = {};
     const sent = [];
-    let seq = 1200, lost = 0, cycle = 0;
+    let seq = 1200, lost = 0, cycle = 0, prev = null;
     const t0 = performance.now();
+    const round = (v, d) => (isNum(v) ? Number(v.toFixed(d)) : null);
 
     handleMessage(JSON.stringify(config));
 
@@ -1189,43 +1273,56 @@
       if (rand() < 0.012) { lost += 1; return; }
 
       // Velocidad de paseo con ligeras variaciones, en torno a 0.85 m/s
-      const [tx, ty] = pointAt(0.85 * t - 0.6 * Math.cos(t / 2.5) + 0.6);
-      const blocked = MOCK_CASE === 'invalid' ? true : cycle % 140 >= 134;
-      const raw = {
-        a: Math.hypot(tx - config.anchors.a.x, ty - config.anchors.a.y, dh) + 0.008 * gauss(),
-        b: Math.hypot(tx - config.anchors.b.x, ty - config.anchors.b.y, dh) + 0.008 * gauss()
-      };
-      // Con la medida de A descartada, su distancia filtrada no se actualiza
-      if (filtered.a === null || !blocked) filtered.a = filtered.a === null ? raw.a : filtered.a + 0.4 * (raw.a - filtered.a);
-      filtered.b = filtered.b === null ? raw.b : filtered.b + 0.4 * (raw.b - filtered.b);
+      const truth = pointAt(0.85 * t - 0.6 * Math.cos(t / 2.5) + 0.6);
+      const noPos = MOCK_CASE === 'nopos';
+      // Cada 15 s el ancla C cae 3 s; con case=twoanchors cae desde el primer segundo
+      const cDown = MOCK_CASE === 'twoanchors' ? t > 1 : cycle % 150 >= 95 && cycle % 150 < 125;
 
-      const ra = Math.sqrt(Math.max(filtered.a * filtered.a - dh * dh, 0));
-      const rb = Math.sqrt(Math.max(filtered.b * filtered.b - dh * dh, 0));
-      const x = (ra * ra - rb * rb + span * span) / (2 * span);
-      const y = Math.sqrt(Math.max(ra * ra - x * x, 0));
-      const zone = config.zones.find((z) => x >= z.x_m && x <= z.x_m + z.width_m && y >= z.y_m && y <= z.y_m + z.height_m);
+      const ranges = {};
+      const used = [];
+      for (const a of config.anchors) {
+        const down = noPos || (a.id === 'c' && cDown);
+        const raw = Math.hypot(truth[0] - a.x, truth[1] - a.y, dh) + 0.008 * gauss();
+        if (!down) filtered[a.id] = filtered[a.id] === undefined ? raw : filtered[a.id] + 0.6 * (raw - filtered[a.id]);
+        // Tras un rato sin medidas, el ancla deja de tener distancia
+        if (down && (noPos || (MOCK_CASE === 'twoanchors' && t > 2))) delete filtered[a.id];
+        const d = filtered[a.id];
+        const r = isNum(d) ? Math.sqrt(Math.max(d * d - dh * dh, 0)) : null;
+        ranges[a.id] = {
+          d: round(d, 3), r: round(r, 3),
+          q: down ? Math.round(clamp(12 + 6 * gauss(), 0, 255)) : Math.round(clamp(205 + 6 * gauss(), 0, 255)),
+          ok: !down
+        };
+        if (!down && isNum(r)) used.push({ x: a.x, y: a.y, r });
+      }
+
+      let pos = null, err = null;
+      if (used.length >= 2) {
+        const sol = solve(used, prev || [truth[0] + 0.05, truth[1] + 0.05]);
+        pos = sol.p; err = sol.err;
+        prev = pos;
+      } else prev = null;
+      const zone = pos && config.zones.find((z) => pos[0] >= z.x_m && pos[0] <= z.x_m + z.width_m && pos[1] >= z.y_m && pos[1] <= z.y_m + z.height_m);
 
       sent.push(now);
       while (sent.length && sent[0] < now - 1000) sent.shift();
-      const round = (v, d) => Number(v.toFixed(d));
-      const noPos = MOCK_CASE === 'nopos';
       handleMessage(JSON.stringify({
         type: 'sample', seq,
-        x: noPos ? null : round(x, 3), y: noPos ? null : round(y, 3),
-        d_a: noPos ? null : round(filtered.a, 3), d_b: noPos ? null : round(filtered.b, 3),
-        r_a: noPos ? null : round(ra, 3), r_b: noPos ? null : round(rb, 3),
-        q_a: Math.round(clamp((blocked ? 35 : 208) + 6 * gauss(), 0, 255)),
-        q_b: Math.round(clamp(198 + 6 * gauss(), 0, 255)),
+        x: pos ? round(pos[0], 3) : null, y: pos ? round(pos[1], 3) : null,
+        err_m: pos ? round(err, 3) : null,
+        anchors_used: pos ? used.length : 0,
+        ranges,
         rate_hz: sent.length > 1 ? round(((sent.length - 1) * 1000) / (now - sent[0]), 1) : null,
         latency_ms: Math.round(clamp(82 + 7 * gauss(), 40, 200)),
         lost,
-        zone: noPos || !zone ? null : zone.name,
-        valid: !(blocked || noPos)
+        zone: zone ? zone.name : null,
+        valid: Boolean(pos) && used.length >= 3 && MOCK_CASE !== 'invalid'
       }));
     }, 100);
   }
 
   // ---------- Arranque ----------
+  buildAnchorRows(DEFAULT_IDS.map((id, i) => ({ id, name: upper(id), color: ANCHOR_COLORS[i] })));
   updateModeUi();
   if (typeof ResizeObserver !== 'undefined') new ResizeObserver(resize).observe(dom.stage);
   window.addEventListener('resize', resize);

@@ -2,7 +2,8 @@
 """Genera logs sintéticos con el formato de log del contrato de datos.
 
 Sirve para desarrollar y probar el bridge y el dashboard sin hardware. La
-geometría (D, alturas, sala y zonas) sale de config.yaml. Con los mismos
+geometría (anclas con su altura, altura del tag, sala y zonas) sale de
+config.yaml. Con los mismos
 argumentos y la misma semilla el fichero generado es idéntico.
 
 Los dos logs de ejemplo del repo se generaron así:
@@ -10,11 +11,11 @@ Los dos logs de ejemplo del repo se generaron así:
     python tools/sim.py rect --out logs/ejemplo-rectangulo.csv
     python tools/sim.py walk --out logs/ejemplo-paseo.csv
 
-Otros usos: un punto quieto, y un paseo con el ancla A tapada entre los
+Otros usos: un punto quieto, y un paseo con el ancla C tapada entre los
 segundos 22 y 24.5:
 
     python tools/sim.py static --x 2.0 --y 2.0 --out logs/estatico.csv
-    python tools/sim.py walk --obstruction a:22:2.5 --out logs/paseo-tapado.csv
+    python tools/sim.py walk --obstruction c:22:2.5 --out logs/paseo-tapado.csv
 """
 
 import argparse
@@ -31,7 +32,19 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CONFIG_PATH = REPO_ROOT / "config.yaml"
 
-LOG_COLUMNS = ("t_host_ms", "seq", "d_a", "d_b", "q_a", "q_b", "t_ms", "x", "y", "zone")
+# El protocolo del tag mide siempre estas tres anclas, en este orden.
+ANCHOR_IDS = ("a", "b", "c")
+LOG_COLUMNS = (
+    "t_host_ms",
+    "seq",
+    *(f"d_{i}" for i in ANCHOR_IDS),
+    *(f"q_{i}" for i in ANCHOR_IDS),
+    "t_ms",
+    "x",
+    "y",
+    "zone",
+)
+MAX_DISTANCE_MM = 65534
 SCENARIOS = ("static", "rect", "walk")
 
 PERIOD_MS = 100
@@ -49,15 +62,15 @@ WALL_MARGIN_M = 0.2
 
 @dataclass(frozen=True)
 class Geometry:
-    anchor_distance_m: float
-    height_diff_m: float
+    anchors: dict  # id → (x, y, z)
+    tag_height_m: float
     room: dict
     zones: list
 
 
 @dataclass(frozen=True)
 class Obstruction:
-    anchor: str  # "a" o "b"
+    anchor: str  # id del ancla
     start_s: float
     duration_s: float
 
@@ -70,8 +83,8 @@ class Options:
     scenario: str = "static"
     duration_s: float = 30.0
     seed: int = 1
-    x_m: float | None = None  # solo para static; por defecto, centrado a 2 m de la pared
-    y_m: float = 2.0
+    x_m: float | None = None  # solo para static; por defecto, el centro de la sala
+    y_m: float | None = None
     sigma_m: float = 0.03
     outlier_rate: float = 0.02
     lost_rate: float = 0.01
@@ -82,20 +95,21 @@ class Options:
 
 def load_geometry(path: Path | str = DEFAULT_CONFIG_PATH) -> Geometry:
     data = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+    anchors = {str(a["id"]): (float(a["x_m"]), float(a["y_m"]), float(a["z_m"])) for a in data["anchors"]}
+    if set(anchors) != set(ANCHOR_IDS):
+        raise ValueError(f"el simulador necesita las anclas {', '.join(ANCHOR_IDS)}; la configuración tiene {', '.join(anchors)}")
     return Geometry(
-        anchor_distance_m=float(data["anchors"]["distance_m"]),
-        height_diff_m=float(data["anchors"]["height_m"]) - float(data["tag"]["height_m"]),
+        anchors=anchors,
+        tag_height_m=float(data["tag"]["height_m"]),
         room={k: float(v) for k, v in data["room"].items()},
         zones=list(data.get("zones") or []),
     )
 
 
-def true_distances(geometry: Geometry, x: float, y: float) -> tuple[float, float]:
+def true_distances(geometry: Geometry, x: float, y: float) -> dict[str, float]:
     """Distancias 3D del tag a cada ancla, como las mide la radio."""
-    dh = geometry.height_diff_m
-    d_a = math.sqrt(x**2 + y**2 + dh**2)
-    d_b = math.sqrt((x - geometry.anchor_distance_m) ** 2 + y**2 + dh**2)
-    return d_a, d_b
+    h = geometry.tag_height_m
+    return {i: math.sqrt((x - ax) ** 2 + (y - ay) ** 2 + (az - h) ** 2) for i, (ax, ay, az) in geometry.anchors.items()}
 
 
 def zone_at(geometry: Geometry, x: float, y: float) -> str:
@@ -114,8 +128,10 @@ def _room_centre(geometry: Geometry) -> tuple[float, float]:
 
 
 def static_path(geometry: Geometry, options: Options):
-    x = geometry.anchor_distance_m / 2 if options.x_m is None else options.x_m
-    return lambda t_s: (x, options.y_m)
+    cx, cy = _room_centre(geometry)
+    x = cx if options.x_m is None else options.x_m
+    y = cy if options.y_m is None else options.y_m
+    return lambda t_s: (x, y)
 
 
 def rect_path(geometry: Geometry):
@@ -239,7 +255,7 @@ def _measure(rng: random.Random, true_m: float, options: Options, bias_m: float 
             jump = -jump
         distance += jump
 
-    return max(round(distance * 1000), 0), min(max(quality, 0), 255)
+    return min(max(round(distance * 1000), 0), MAX_DISTANCE_MM), min(max(quality, 0), 255)
 
 
 def generate(options: Options, geometry: Geometry) -> list[dict]:
@@ -253,15 +269,14 @@ def generate(options: Options, geometry: Geometry) -> list[dict]:
     for cycle in range(round(options.duration_s * 1000 / PERIOD_MS)):
         t_s = cycle * PERIOD_MS / 1000
         x, y = position(t_s)
-        true_a, true_b = true_distances(geometry, x, y)
+        true = true_distances(geometry, x, y)
 
-        bias = {"a": None, "b": None}
+        bias = dict.fromkeys(ANCHOR_IDS)
         for obstruction, bias_m in biases.items():
             if obstruction.covers(t_s):
                 bias[obstruction.anchor] = bias_m
 
-        d_a, q_a = _measure(rng, true_a, options, bias["a"])
-        d_b, q_b = _measure(rng, true_b, options, bias["b"])
+        measured = {i: _measure(rng, true[i], options, bias[i]) for i in ANCHOR_IDS}
         # Retraso entre el envío del tag y la llegada al Mac: una base fija más
         # una cola, siempre menor que un ciclo para que el orden no cambie.
         delay_ms = 12 + min(rng.expovariate(1 / 6.0), 70.0)
@@ -273,10 +288,8 @@ def generate(options: Options, geometry: Geometry) -> list[dict]:
             {
                 "t_host_ms": HOST_START_MS + cycle * PERIOD_MS + round(delay_ms),
                 "seq": (options.seq_start + cycle) % SEQ_MODULO,
-                "d_a": d_a,
-                "d_b": d_b,
-                "q_a": q_a,
-                "q_b": q_b,
+                **{f"d_{i}": measured[i][0] for i in ANCHOR_IDS},
+                **{f"q_{i}": measured[i][1] for i in ANCHOR_IDS},
                 "t_ms": TAG_START_MS + cycle * PERIOD_MS,
                 "x": f"{x:.3f}",
                 "y": f"{y:.3f}",
@@ -308,7 +321,7 @@ def _obstruction(text: str) -> Obstruction:
     try:
         anchor, start, duration = text.split(":")
         anchor = anchor.lower()
-        if anchor not in ("a", "b"):
+        if anchor not in ANCHOR_IDS:
             raise ValueError
         return Obstruction(anchor, float(start), float(duration))
     except ValueError:
@@ -329,8 +342,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--config", metavar="FICHERO", default=DEFAULT_CONFIG_PATH, help="por defecto, config.yaml del repo")
     parser.add_argument("--duration", type=float, default=30.0, metavar="S", help="duración en segundos (por defecto 30)")
     parser.add_argument("--seed", type=int, default=1, help="semilla del generador (por defecto 1)")
-    parser.add_argument("--x", type=float, metavar="M", help="posición x para static (por defecto, D/2)")
-    parser.add_argument("--y", type=float, default=2.0, metavar="M", help="posición y para static (por defecto 2)")
+    parser.add_argument("--x", type=float, metavar="M", help="posición x para static (por defecto, el centro de la sala)")
+    parser.add_argument("--y", type=float, metavar="M", help="posición y para static (por defecto, el centro de la sala)")
     parser.add_argument("--sigma-cm", type=float, default=3.0, metavar="CM", help="desviación típica del ruido (por defecto 3)")
     parser.add_argument("--outliers", type=_rate, default=0.02, metavar="P", help="fracción de outliers (por defecto 0.02)")
     parser.add_argument("--lost", type=_rate, default=0.01, metavar="P", help="fracción de ciclos perdidos (por defecto 0.01)")

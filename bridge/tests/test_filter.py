@@ -4,7 +4,7 @@ import pytest
 
 from uwb_bridge.filters import FilterOutput, MedianEmaFilter
 from uwb_bridge.pipeline import Pipeline
-from uwb_bridge.sample import Sample
+from helpers import make_sample
 
 GOOD = 200
 
@@ -19,8 +19,24 @@ def test_no_value_before_first_valid_sample():
     assert flt.update(2.0, 10) == FilterOutput(None, accepted=False)
 
 
-def test_first_valid_sample_passes_through():
-    assert MedianEmaFilter().update(2.5, GOOD) == FilterOutput(2.5, accepted=True)
+def test_value_appears_after_the_warmup_samples():
+    flt = MedianEmaFilter(warmup_samples=3)
+    outputs = feed(flt, [2.5, 2.6, 2.4, 2.5])
+    assert [o.accepted for o in outputs] == [True] * 4
+    assert [o.value_m for o in outputs[:2]] == [None, None]
+    # La primera salida es la mediana de las tres, sin media exponencial detrás.
+    assert outputs[2].value_m == pytest.approx(2.5)
+
+
+def test_outlier_among_the_first_samples_does_not_leak():
+    flt = MedianEmaFilter()
+    outputs = feed(flt, [6.0, 2.5, 2.5, 2.5])
+    assert outputs[2].value_m == pytest.approx(2.5)
+    assert outputs[3].value_m == pytest.approx(2.5)
+
+
+def test_warmup_with_a_single_sample_window():
+    assert MedianEmaFilter(median_window=1).update(2.5, GOOD) == FilterOutput(2.5, accepted=True)
 
 
 def test_single_spike_is_rejected():
@@ -165,7 +181,7 @@ def test_reset_forgets_everything():
     feed(flt, [2.0] * 5)
     flt.reset()
     assert flt.update(None, 0).value_m is None
-    assert flt.update(7.0, GOOD) == FilterOutput(7.0, accepted=True)
+    assert [o.value_m for o in feed(flt, [7.0] * 3)] == [None, None, 7.0]
 
 
 def test_pipeline_accepts_another_filter_class(config):
@@ -181,7 +197,7 @@ def test_pipeline_accepts_another_filter_class(config):
             self.value = None
 
     pipeline = Pipeline(config, filter_factory=PassThrough)
-    sample = Sample(t_host_ms=1000, seq=0, d_a=2500, d_b=3500, q_a=1, q_b=1, t_ms=0)
+    sample = make_sample({"a": 2500, "b": 3500, "c": 3000}, qualities={"a": 1, "b": 1, "c": 1})
     message = pipeline.process(sample).message
-    assert message["d_a"] == 2.5 and message["d_b"] == 3.5
-    assert message["valid"] is True
+    assert [message["ranges"][i]["d"] for i in "abc"] == [2.5, 3.5, 3.0]
+    assert all(message["ranges"][i]["ok"] for i in "abc")

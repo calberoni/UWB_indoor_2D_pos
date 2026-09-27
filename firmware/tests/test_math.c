@@ -103,13 +103,15 @@ static void test_bytes(void)
 
 static void test_record(void)
 {
-    // Equivale a struct.pack("<HiiBBI", 1234, 2940, -1, 210, 198, 123456).
-    const Record record = {1234, 2940, -1, 210, 198, 123456};
-    const uint8_t expected[RECORD_LEN] = {0xD2, 0x04, 0x7C, 0x0B, 0x00, 0x00, 0xFF, 0xFF,
-                                          0xFF, 0xFF, 0xD2, 0xC6, 0x40, 0xE2, 0x01, 0x00};
+    // Equivale a struct.pack("<HHHHBBBI", 1234, 2940, 0xFFFF, 65534, 210, 0, 198, 123456):
+    // el fallo (-1) va como 0xFFFF y 70000 mm se recorta a 65534.
+    const Record record = {1234, {2940, -1, 70000}, {210, 0, 198}, 123456};
+    const uint8_t expected[RECORD_LEN] = {0xD2, 0x04, 0x7C, 0x0B, 0xFF, 0xFF, 0xFE, 0xFF,
+                                          0xD2, 0x00, 0xC6, 0x40, 0xE2, 0x01, 0x00};
     uint8_t packed[RECORD_LEN];
     record_pack(&record, packed);
     CHECK(memcmp(packed, expected, RECORD_LEN) == 0);
+    CHECK(RECORD_LEN <= 20);
 }
 
 int main(void)

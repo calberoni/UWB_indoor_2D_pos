@@ -93,19 +93,20 @@ class Node:
         if self.role == "TAG":
             if line.startswith("#"):
                 return None
+            # seq,d_a,d_b,d_c,q_a,q_b,q_c,t_ms
             fields = line.split(",")
-            if len(fields) != 6:
+            if len(fields) != 8:
                 return None
             try:
-                return int(fields[1 if anchor == "a" else 2])
+                return int(fields[1 + "abc".index(anchor)])
             except ValueError:
                 return None
-        # Ancla: "# RAW" seguido de seis timestamps y la distancia
+        # Ancla: "# RAW <ancla>" seguido de seis timestamps y la distancia
         fields = line.split()
-        if len(fields) != 9 or fields[:2] != ["#", "RAW"]:
+        if len(fields) != 10 or fields[:2] != ["#", "RAW"] or fields[2] != anchor:
             return None
         try:
-            return int(fields[8])
+            return int(fields[9])
         except ValueError:
             return None
 
@@ -136,7 +137,7 @@ def report(measurement, true_mm, antenna_delay):
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--port", required=True, help="puerto serie del nodo conectado")
-    parser.add_argument("--anchor", choices=("a", "b"), default="a", help="ancla del par que se mide")
+    parser.add_argument("--anchor", choices=("a", "b", "c"), default="a", help="ancla del par que se mide")
     parser.add_argument("--distance", type=float, required=True, help="distancia real, en metros")
     parser.add_argument("--samples", type=int, default=200)
     parser.add_argument("--tolerance", type=float, default=20.0, help="error admitido, en mm")
@@ -150,7 +151,7 @@ def main():
         node = Node(args.port)
         time.sleep(0.5)
         node.identify()
-        expected_anchor = {"ANCLA_A": "a", "ANCLA_B": "b"}.get(node.role)
+        expected_anchor = {"ANCLA_A": "a", "ANCLA_B": "b", "ANCLA_C": "c"}.get(node.role)
         if expected_anchor and expected_anchor != args.anchor:
             parser.error(f"el nodo conectado es {node.role}; usa --anchor {expected_anchor}")
         print(f"Nodo {node.role}, par tag-ancla {args.anchor.upper()}, distancia real {true_mm:.0f} mm")
@@ -178,7 +179,7 @@ def main():
         else:
             print(
                 f"Corrección equivalente en config.yaml: "
-                f"anchors.offset_cm.{args.anchor} = {-error / 10.0:+.1f}"
+                f"offset_cm del ancla {args.anchor} = {-error / 10.0:+.1f}"
             )
         if measurement[1] > 50.0:
             print("Aviso: sigma mayor de 50 mm; revisa la línea de visión y los reflejos.")

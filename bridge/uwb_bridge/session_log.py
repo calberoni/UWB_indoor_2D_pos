@@ -2,6 +2,7 @@ import csv
 from datetime import datetime
 from pathlib import Path
 
+from .config import PROTOCOL_ANCHOR_IDS
 from .parsers import LOG_COLUMNS
 from .pipeline import Result
 from .sample import Sample
@@ -28,10 +29,8 @@ class SessionLog:
             [
                 sample.t_host_ms,
                 sample.seq,
-                sample.d_a,
-                sample.d_b,
-                sample.q_a,
-                sample.q_b,
+                *(sample.distances_mm[i] for i in PROTOCOL_ANCHOR_IDS),
+                *(sample.qualities[i] for i in PROTOCOL_ANCHOR_IDS),
                 sample.t_ms,
                 f"{result.x:.3f}" if has_position else "",
                 f"{result.y:.3f}" if has_position else "",

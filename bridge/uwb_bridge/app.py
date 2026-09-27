@@ -49,8 +49,9 @@ async def run(
                 continue
             reported = last_message
             discarded = f" · ilegibles {transport.discarded}" if transport.discarded else ""
+            rate = "—" if reported["rate_hz"] is None else f"{reported['rate_hz']:.1f}"
             print(
-                f"{reported['rate_hz']:.1f} Hz · latencia {reported['latency_ms']} ms"
+                f"{rate} Hz · latencia {reported['latency_ms']} ms"
                 f" · perdidos {reported['lost']}{discarded} · clientes {hub.client_count}"
             )
 

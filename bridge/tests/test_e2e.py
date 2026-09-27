@@ -15,23 +15,30 @@ from websockets.asyncio.client import connect
 
 import sim
 
+NUMBER = "número"
+NULLABLE_NUMBER = "número o null"
 SAMPLE_FIELDS = {
     "type": str,
     "seq": int,
-    "x": float,
-    "y": float,
-    "d_a": float,
-    "d_b": float,
-    "r_a": float,
-    "r_b": float,
-    "q_a": int,
-    "q_b": int,
-    "rate_hz": float,
+    "x": NULLABLE_NUMBER,
+    "y": NULLABLE_NUMBER,
+    "err_m": NULLABLE_NUMBER,
+    "anchors_used": int,
+    "ranges": dict,
+    "rate_hz": NULLABLE_NUMBER,
     "latency_ms": int,
     "lost": int,
     "zone": (str, type(None)),
     "valid": bool,
 }
+
+
+def has_type(value, kind) -> bool:
+    if kind in (NUMBER, NULLABLE_NUMBER):
+        if value is None:
+            return kind == NULLABLE_NUMBER
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    return isinstance(value, kind) and not (kind is int and isinstance(value, bool))
 
 
 @pytest.fixture
@@ -93,7 +100,11 @@ async def test_replay_publishes_config_and_samples(repo_root, workspace):
         assert config["type"] == "config"
         assert config["source"] == "replay"
         assert set(config) == {"type", "source", "anchors", "tag", "room", "zones", "display"}
-        assert config["anchors"] == {"a": {"x": 0.0, "y": 0.0}, "b": {"x": 4.0, "y": 0.0}, "height_m": 1.8}
+        assert config["anchors"] == [
+            {"id": "a", "x": 0.0, "y": 0.0, "z": 1.8},
+            {"id": "b", "x": 4.0, "y": 0.0, "z": 1.8},
+            {"id": "c", "x": 2.0, "y": 4.0, "z": 1.8},
+        ]
         assert config["tag"] == {"height_m": 1.2}
         assert config["room"] == {"x_min_m": -0.5, "x_max_m": 4.5, "y_min_m": 0.0, "y_max_m": 4.0}
         assert [z["name"] for z in config["zones"]] == ["mesa", "estantería", "puerta"]
@@ -104,19 +115,27 @@ async def test_replay_publishes_config_and_samples(repo_root, workspace):
             assert set(sample) == set(SAMPLE_FIELDS)
             assert sample["type"] == "sample"
             for field, kind in SAMPLE_FIELDS.items():
-                value = sample[field]
-                if kind is float:
-                    assert isinstance(value, (int, float)) and not isinstance(value, bool), field
-                else:
-                    assert isinstance(value, kind), field
+                assert has_type(sample[field], kind), field
+            assert list(sample["ranges"]) == ["a", "b", "c"]
+            for entry in sample["ranges"].values():
+                assert set(entry) == {"d", "r", "q", "ok"}
+                assert isinstance(entry["q"], int) and isinstance(entry["ok"], bool)
+                assert (entry["d"] is None) == (entry["r"] is None)
+                if entry["d"] is not None:
+                    assert 0 <= entry["r"] <= entry["d"]
+            assert sample["anchors_used"] in (0, 2, 3)
+            assert (sample["x"] is None) == (sample["err_m"] is None) == (sample["anchors_used"] == 0)
 
         seqs = [s["seq"] for s in samples]
         assert seqs == sorted(seqs) and len(set(seqs)) == len(seqs)
         last = samples[-1]
         assert 9.0 <= last["rate_hz"] <= 11.0
+        assert all(s["rate_hz"] is not None for s in samples[1:])
+        # El paseo simulado tiene posición en cuanto se calientan los filtros.
+        assert all(s["x"] is not None for s in samples if s["seq"] >= 3)
         assert 0 <= last["latency_ms"] < 100
-        assert all(-0.5 <= s["x"] <= 4.5 and 0.0 <= s["y"] <= 4.0 for s in samples)
-        assert all(s["r_a"] <= s["d_a"] and s["r_b"] <= s["d_b"] for s in samples)
+        assert all(-0.5 <= s["x"] <= 4.5 and 0.0 <= s["y"] <= 4.0 for s in samples if s["x"] is not None)
+        assert sum(s["anchors_used"] == 3 for s in samples) > 0.9 * len(samples)
 
         # El servidor HTTP sirve la carpeta dashboard/ del repo, esté como esté.
         with urllib.request.urlopen(f"http://localhost:{http_port}/", timeout=3) as response:

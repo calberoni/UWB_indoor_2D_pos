@@ -1,8 +1,8 @@
 # UWB Indoor Positioning
 #
 #   make setup                     instala herramientas y dependencias
-#   make firmware                  compila los tres nodos
-#   make flash ROLE=tag            graba un nodo (anchor_a, anchor_b o tag)
+#   make firmware                  compila los cuatro nodos
+#   make flash ROLE=tag            graba un nodo (anchor_a, anchor_b, anchor_c o tag)
 #   make nodes                     placas conectadas y su rol
 #   make demo                      bridge por BLE y dashboard en el navegador
 #   make demo SERIAL=1             lo mismo por USB serie
@@ -15,7 +15,7 @@ PYTHON := .venv/bin/python
 BRIDGE := PYTHONPATH=bridge $(PYTHON) -m uwb_bridge
 LOG    ?= logs/ejemplo-paseo.csv
 
-.PHONY: setup firmware anchor_a anchor_b tag flash nodes demo replay sim test gif clean
+.PHONY: setup firmware anchor_a anchor_b anchor_c tag flash nodes demo replay sim test gif clean
 
 setup:
 	tools/setup.sh
@@ -23,7 +23,7 @@ setup:
 firmware:
 	$(MAKE) -C firmware all
 
-anchor_a anchor_b tag:
+anchor_a anchor_b anchor_c tag:
 	$(MAKE) -C firmware $@
 
 flash:

@@ -91,9 +91,9 @@ static void print_stats()
                    (unsigned long)stats.error, (unsigned long)stats.late);
 }
 
-static void print_raw(const RangingRaw &raw)
+static void print_raw(char anchor, const RangingRaw &raw)
 {
-    console_printf("# RAW %lu %lu %lu %lu %lu %lu %ld\n", (unsigned long)raw.poll_tx,
+    console_printf("# RAW %c %lu %lu %lu %lu %lu %lu %ld\n", anchor, (unsigned long)raw.poll_tx,
                    (unsigned long)raw.resp_rx, (unsigned long)raw.final_tx,
                    (unsigned long)raw.poll_rx, (unsigned long)raw.resp_tx,
                    (unsigned long)raw.final_rx, (long)raw.distance_mm);
@@ -107,31 +107,39 @@ static uint32_t period_ms = 1000 / DEFAULT_RATE_HZ;
 static uint32_t next_cycle_ms;
 static uint16_t cycle_seq;
 
+static const uint16_t ANCHOR_ADDRS[RECORD_ANCHORS] = {ADDR_ANCHOR_A, ADDR_ANCHOR_B,
+                                                       ADDR_ANCHOR_C};
+static const char ANCHOR_NAMES[RECORD_ANCHORS] = {'a', 'b', 'c'};
+
 static void run_cycle()
 {
-    RangingRaw raw_a, raw_b;
-    RangingResult a = ranging_initiate(ADDR_ANCHOR_A, &raw_a);
-    delayMicroseconds(INTER_RANGING_GAP_US);
-    RangingResult b = ranging_initiate(ADDR_ANCHOR_B, &raw_b);
-
     Record record;
+    RangingRaw raw[RECORD_ANCHORS];
+    int completed = 0;
+
     record.seq = cycle_seq++;
-    record.d_a = a.distance_mm;
-    record.d_b = b.distance_mm;
-    record.q_a = a.quality;
-    record.q_b = b.quality;
+    for (int i = 0; i < RECORD_ANCHORS; i++) {
+        if (i > 0) {
+            delayMicroseconds(INTER_RANGING_GAP_US);
+        }
+        RangingResult result = ranging_initiate(ANCHOR_ADDRS[i], &raw[i]);
+        record.distance_mm[i] = result.distance_mm;
+        record.quality[i] = result.quality;
+        if (result.distance_mm >= 0) {
+            completed++;
+        }
+    }
     record.t_ms = millis();
     telemetry_send(record);
 
     if (raw_enabled) {
-        if (a.distance_mm >= 0) {
-            print_raw(raw_a);
-        }
-        if (b.distance_mm >= 0) {
-            print_raw(raw_b);
+        for (int i = 0; i < RECORD_ANCHORS; i++) {
+            if (record.distance_mm[i] >= 0) {
+                print_raw(ANCHOR_NAMES[i], raw[i]);
+            }
         }
     }
-    if (a.distance_mm >= 0 && b.distance_mm >= 0) {
+    if (completed == RECORD_ANCHORS) {
         led_flash();
     }
 }
@@ -161,7 +169,7 @@ static void anchor_loop()
     if (ranging_respond(&raw)) {
         led_flash();
         if (raw_enabled) {
-            print_raw(raw);
+            print_raw((char)('a' + (MY_ADDR - ADDR_ANCHOR_A)), raw);
         }
     }
     if (millis() - last_stats_ms >= 5000) {
