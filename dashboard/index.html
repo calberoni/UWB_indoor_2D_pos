@@ -1,0 +1,1239 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<title>UWB · Posición en interiores</title>
+<link rel="icon" href="data:,">
+<style>
+  :root {
+    color-scheme: dark;
+    /* Unidad de diseño: 19.2 px a 1920×1080, 14.4 px a 1440×900 */
+    --u: max(11px, min(1vw, 1.7778vh));
+    --bg: #07090c;
+    --panel: #0c1014;
+    --line: #1e262d;
+    --line-strong: #2e3942;
+    --text: #eef2f5;
+    --text-2: #a9b5bf;
+    --text-3: #6f7c88;
+    --accent: #35d69b;
+    --anchor-a: #4f9ef5;
+    --anchor-b: #f28b45;
+    --wifi: #f0609a;
+    --good: #35d69b;
+    --warn: #fab219;
+    --crit: #ef5b5b;
+    --font-ui: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-num: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--text); }
+  body { font: 400 var(--u)/1.2 var(--font-ui); -webkit-font-smoothing: antialiased; }
+
+  #app { display: grid; grid-template-columns: minmax(0, 1fr) calc(var(--u) * 30); height: 100vh; }
+  #stage { position: relative; min-width: 0; min-height: 0; }
+  #plan { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+
+  #panel {
+    position: relative;
+    display: flex; flex-direction: column; justify-content: space-between;
+    min-height: 0; overflow: hidden;
+    padding: calc(var(--u) * 1.5) calc(var(--u) * 1.7) calc(var(--u) * 1.2);
+    background: var(--panel);
+    border-left: 1px solid var(--line-strong);
+  }
+  .label {
+    font-size: calc(var(--u) * 0.8); font-weight: 600; line-height: 1;
+    letter-spacing: 0.13em; text-transform: uppercase; color: var(--text-3);
+  }
+  .num { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+  .unit { font-family: var(--font-ui); font-weight: 500; color: var(--text-2); }
+
+  /* Cabecera */
+  .head { display: flex; justify-content: space-between; align-items: flex-start; gap: var(--u); }
+  .head h1 { margin: 0; font-size: calc(var(--u) * 1.3); font-weight: 650; letter-spacing: 0.02em; line-height: 1.1; }
+  .head p { margin: calc(var(--u) * 0.4) 0 0; }
+  #rec {
+    display: flex; align-items: center; gap: 0.5em; white-space: nowrap;
+    padding: 0.35em 0.7em; border: 1px solid var(--crit);
+    font-size: calc(var(--u) * 0.9); font-weight: 650; letter-spacing: 0.1em; color: var(--text);
+  }
+  #rec i { width: 0.7em; height: 0.7em; border-radius: 50%; background: var(--crit); animation: blink 1s steps(2, start) infinite; }
+
+  /* Estado del enlace y de la señal */
+  .status { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .srow { display: flex; align-items: center; justify-content: space-between; padding: calc(var(--u) * 0.55) 0; }
+  .srow + .srow { border-top: 1px solid var(--line); }
+  .sval { display: flex; align-items: center; gap: 0.6em; font-size: calc(var(--u) * 1.02); font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; }
+  .led { width: 0.72em; height: 0.72em; border-radius: 50%; background: var(--text-3); flex: none; }
+  [data-state="open"] .led, [data-state="ok"] .led { background: var(--good); box-shadow: 0 0 0.7em var(--good); }
+  [data-state="connecting"] .led, [data-state="retry"] .led { background: var(--warn); animation: blink 1s steps(2, start) infinite; }
+  [data-state="doubt"] .led, [data-state="nopos"] .led { background: var(--warn); }
+  [data-state="lost"] .led { background: var(--crit); }
+  [data-state="mock"] .led { background: var(--anchor-a); }
+  @keyframes blink { to { visibility: hidden; } }
+
+  /* Selector de modo */
+  .mode .label { margin-bottom: calc(var(--u) * 0.55); }
+  .seg { display: grid; grid-template-columns: 1fr 1.6fr; border: 1px solid var(--line-strong); }
+  .seg button {
+    appearance: none; margin: 0; border: 0; cursor: pointer;
+    padding: calc(var(--u) * 0.7) calc(var(--u) * 0.4);
+    background: transparent; color: var(--text-2);
+    font: 650 calc(var(--u) * 1.05)/1 var(--font-ui); letter-spacing: 0.08em;
+  }
+  .seg button + button { border-left: 1px solid var(--line-strong); }
+  .seg button:hover { color: var(--text); }
+  .seg button:focus-visible { outline: 2px solid var(--text); outline-offset: -4px; }
+  #btnUwb[aria-pressed="true"] { background: var(--accent); color: #04130d; }
+  #btnWifi[aria-pressed="true"] { background: var(--wifi); color: #1a0410; }
+  .unc { display: flex; justify-content: space-between; align-items: baseline; margin-top: calc(var(--u) * 0.6); }
+  .unc b { font-size: calc(var(--u) * 1.35); font-weight: 600; }
+
+  /* Distancias */
+  .dist { display: grid; gap: calc(var(--u) * 0.9); }
+  .drow { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; column-gap: calc(var(--u) * 1); align-items: end; }
+  .badge {
+    align-self: center;
+    width: calc(var(--u) * 2.5); height: calc(var(--u) * 2.5);
+    display: grid; place-items: center;
+    font: 750 calc(var(--u) * 1.6)/1 var(--font-ui); color: #06090c;
+  }
+  .drow[data-anchor="a"] .badge { background: var(--anchor-a); }
+  .drow[data-anchor="b"] .badge { background: var(--anchor-b); }
+  .big { font-size: calc(var(--u) * 4.1); font-weight: 600; line-height: 0.95; letter-spacing: -0.03em; white-space: nowrap; margin-top: calc(var(--u) * 0.35); }
+  .big .unit { font-size: 0.42em; letter-spacing: 0; margin-left: 0.25em; }
+  .qual { width: calc(var(--u) * 6.2); padding-bottom: calc(var(--u) * 0.4); }
+  .qual .qv { font-size: calc(var(--u) * 1.7); font-weight: 600; line-height: 1; margin: calc(var(--u) * 0.4) 0; }
+  .bar { height: calc(var(--u) * 0.36); background: var(--line-strong); }
+  .bar i { display: block; height: 100%; width: 0; background: var(--text-2); transition: width 120ms linear; }
+
+  /* Métricas */
+  .grid { display: grid; grid-template-columns: 1fr 1fr; border-top: 1px solid var(--line); }
+  .cell { padding: calc(var(--u) * 0.75) 0 calc(var(--u) * 0.7); border-bottom: 1px solid var(--line); min-width: 0; }
+  .cell:nth-child(odd) { padding-right: var(--u); border-right: 1px solid var(--line); }
+  .cell:nth-child(even) { padding-left: var(--u); }
+  .cell .v { font-size: calc(var(--u) * 2.5); font-weight: 600; line-height: 1; margin-top: calc(var(--u) * 0.45); white-space: nowrap; }
+  .cell .v .unit { font-size: 0.5em; margin-left: 0.3em; }
+  .cell .v.txt { font-family: var(--font-ui); font-size: calc(var(--u) * 1.75); letter-spacing: 0.04em; text-transform: uppercase; padding: calc(var(--u) * 0.375) 0; }
+  .cell.minor .v { font-size: calc(var(--u) * 1.75); color: var(--text-2); }
+  .cell .v.txt.empty { font-family: var(--font-num); }
+  .empty { color: var(--text-3); }
+  #panel.stale .big, #panel.stale .cell .v:not(.txt), #panel.stale .qv { color: var(--text-3); }
+  #panel.stale .big .unit, #panel.stale .cell .v .unit { color: var(--text-3); }
+
+  /* Ayuda de teclas */
+  .keys { display: flex; flex-wrap: wrap; gap: calc(var(--u) * 0.35) calc(var(--u) * 1); font-size: calc(var(--u) * 0.8); color: var(--text-3); }
+  .keys span { white-space: nowrap; }
+  kbd {
+    display: inline-block; min-width: 1.7em; padding: 0.12em 0.3em; margin-right: 0.35em;
+    border: 1px solid var(--line-strong); text-align: center;
+    font: 650 0.95em/1.2 var(--font-num); color: var(--text-2);
+  }
+
+  /* Aviso al pie del panel: grabación lista, acciones de teclado */
+  #toast {
+    position: absolute; left: 0; right: 0; bottom: 0;
+    display: flex; align-items: center; gap: calc(var(--u) * 0.8);
+    min-height: calc(var(--u) * 5);
+    padding: calc(var(--u) * 0.9) calc(var(--u) * 1.7);
+    background: #141a20; border-top: 1px solid var(--line-strong);
+    font-size: calc(var(--u) * 0.95); color: var(--text);
+  }
+  #toast .msg { flex: 1; min-width: 0; font-weight: 600; }
+  #toast small { display: block; margin-top: 0.25em; font-size: 0.9em; font-weight: 400; color: var(--text-2); }
+  #toast small:empty { display: none; }
+  #toastSave {
+    padding: 0.45em 0.8em; background: var(--text); color: #06090c; text-decoration: none;
+    font-weight: 650; letter-spacing: 0.06em; text-transform: uppercase; white-space: nowrap;
+  }
+  #toastClose { appearance: none; border: 1px solid var(--line-strong); background: transparent; color: var(--text-2); font: inherit; padding: 0.4em 0.7em; cursor: pointer; }
+</style>
+</head>
+<body>
+<main id="app">
+  <section id="stage">
+    <canvas id="plan" aria-label="Plano de la sala con la posición del tag"></canvas>
+  </section>
+
+  <aside id="panel" aria-label="Panel de medidas">
+    <header class="head">
+      <div>
+        <h1>Posicionamiento UWB</h1>
+        <p class="label">Plano 2D · tiempo real</p>
+      </div>
+      <div id="rec" hidden><i></i><span id="recText">REC</span></div>
+    </header>
+
+    <section class="status">
+      <div class="srow" id="linkRow" data-state="connecting">
+        <span class="label">Enlace</span>
+        <span class="sval"><i class="led"></i><span id="linkText">Conectando…</span></span>
+      </div>
+      <div class="srow" id="signalRow" data-state="lost">
+        <span class="label">Señal</span>
+        <span class="sval"><i class="led"></i><span id="signalText">Sin señal</span></span>
+      </div>
+    </section>
+
+    <section class="mode">
+      <div class="label">Modo de visualización</div>
+      <div class="seg" role="group" aria-label="Modo de visualización">
+        <button type="button" id="btnUwb" aria-pressed="true">UWB</button>
+        <button type="button" id="btnWifi" aria-pressed="false">SIMULACIÓN WiFi</button>
+      </div>
+      <div class="unc"><span class="label">Incertidumbre</span><b class="num empty" id="uncValue">--</b></div>
+    </section>
+
+    <section class="dist">
+      <div class="drow" data-anchor="a">
+        <div class="badge">A</div>
+        <div>
+          <div class="label">Distancia al ancla A</div>
+          <div class="big num"><span id="dA" class="empty">-.--</span><span class="unit">m</span></div>
+        </div>
+        <div class="qual">
+          <div class="label">Calidad</div>
+          <div class="empty qv num" id="qA">--</div>
+          <div class="bar"><i id="qABar"></i></div>
+        </div>
+      </div>
+      <div class="drow" data-anchor="b">
+        <div class="badge">B</div>
+        <div>
+          <div class="label">Distancia al ancla B</div>
+          <div class="big num"><span id="dB" class="empty">-.--</span><span class="unit">m</span></div>
+        </div>
+        <div class="qual">
+          <div class="label">Calidad</div>
+          <div class="empty qv num" id="qB">--</div>
+          <div class="bar"><i id="qBBar"></i></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="cell"><div class="label">Tasa</div><div class="v num"><span id="rate" class="empty">-.-</span><span class="unit">Hz</span></div></div>
+      <div class="cell"><div class="label">Latencia</div><div class="v num"><span id="latency" class="empty">--</span><span class="unit">ms</span></div></div>
+      <div class="cell"><div class="label">Ciclos perdidos</div><div class="empty v num" id="lost">--</div></div>
+      <div class="cell"><div class="label">Fuente de datos</div><div class="v txt empty" id="source">--</div></div>
+      <div class="cell minor"><div class="label">Posición x</div><div class="v num"><span id="posX" class="empty">-.--</span><span class="unit">m</span></div></div>
+      <div class="cell minor"><div class="label">Posición y</div><div class="v num"><span id="posY" class="empty">-.--</span><span class="unit">m</span></div></div>
+    </section>
+
+    <footer class="keys" aria-label="Teclas">
+      <span><kbd>F</kbd>pantalla completa</span>
+      <span><kbd>W</kbd>UWB / WiFi</span>
+      <span><kbd>C</kbd>arcos</span>
+      <span><kbd>R</kbd>reiniciar estela</span>
+      <span><kbd>G</kbd>grabar 10 s</span>
+    </footer>
+
+    <div id="toast" hidden>
+      <span class="msg"><span id="toastText"></span><small class="num" id="toastDetail"></small></span>
+      <a id="toastSave" hidden>Guardar</a>
+      <button type="button" id="toastClose" aria-label="Cerrar aviso">Cerrar</button>
+    </div>
+  </aside>
+</main>
+
+<script>
+(() => {
+  'use strict';
+
+  // ---------- Parámetros de URL ----------
+  const params = new URLSearchParams(location.search);
+  const MOCK = params.get('mock') === '1';
+  const MOCK_CASE = params.get('case') || '';
+  const WS_PORT = (() => {
+    const p = parseInt(params.get('ws'), 10);
+    return p > 0 && p < 65536 ? p : 8765;
+  })();
+  const WS_URL = `ws://${location.hostname || 'localhost'}:${WS_PORT}`;
+
+  // ---------- Constantes ----------
+  const RENDER_DELAY_MS = 50;      // retraso visual fijo del interpolador
+  const EXTRAP_MAX_MS = 80;        // extrapolación máxima más allá de la última muestra
+  const GAP_RESET_MS = 450;        // hueco a partir del cual no se interpola
+  const ERR_TAU_MS = 70;           // constante de tiempo con la que se absorbe una corrección
+  const MAX_SPEED = 0.003;         // m/ms; limita la velocidad usada para extrapolar
+  const SIGNAL_TIMEOUT_MS = 1000;
+  const DOUBT_HOLD_MS = 600;
+  const MODE_ANIM_MS = 900;
+  const RECORD_MS = 10000;
+  const GRID_M = 0.5;
+  const TAU = Math.PI * 2;
+
+  const FONT_UI = 'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
+  const FONT_NUM = 'ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace';
+
+  const C = {
+    bg: '#07090c', floor: '#0c1116', text: '#eef2f5', text2: '#a9b5bf', text3: '#6f7c88',
+    grid: 'rgba(150,185,215,0.075)', gridMajor: 'rgba(150,185,215,0.17)',
+    border: 'rgba(205,222,236,0.5)', wall: '#dfe8ef', hatch: 'rgba(205,222,236,0.3)',
+    accent: '#35d69b', a: '#4f9ef5', b: '#f28b45', wifi: '#f0609a', warn: '#fab219', crit: '#ef5b5b',
+    ink: '#06090c'
+  };
+
+  const SOURCE_LABELS = { serial: 'USB serie', ble: 'BLE', replay: 'Replay', mock: 'Sintética' };
+  const LINK_LABELS = { connecting: 'Conectando…', open: 'Conectado', retry: 'Reconectando…', mock: 'Modo de prueba' };
+  const SIGNAL_LABELS = { ok: 'Recibiendo', doubt: 'Medida dudosa', nopos: 'Sin posición', lost: 'Sin señal' };
+
+  // ---------- Utilidades ----------
+  const $ = (id) => document.getElementById(id);
+  const isNum = (v) => typeof v === 'number' && Number.isFinite(v);
+  const clamp = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const smoothstep = (t) => { t = clamp(t, 0, 1); return t * t * (3 - 2 * t); };
+  const easeInOut = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
+  // Sin dato se muestran guiones con la misma forma que tendría el valor
+  const fmt = (v, digits) => (isNum(v) ? v.toFixed(digits) : digits ? `-.${'-'.repeat(digits)}` : '--');
+  const upper = (s) => String(s).toLocaleUpperCase('es');
+
+  function hexToRgb(hex) {
+    const n = parseInt(hex.slice(1), 16);
+    return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+  }
+  function rgba(hex, alpha) {
+    const [r, g, b] = hexToRgb(hex);
+    return `rgba(${r},${g},${b},${alpha})`;
+  }
+  function mix(hexA, hexB, t, alpha = 1) {
+    const a = hexToRgb(hexA), b = hexToRgb(hexB);
+    const c = a.map((v, i) => Math.round(lerp(v, b[i], t)));
+    return `rgba(${c[0]},${c[1]},${c[2]},${alpha})`;
+  }
+  // Un radio de incertidumbre se lee mejor en cm por debajo de 1 m
+  function fmtUncertainty(m) {
+    if (!isNum(m)) return '--';
+    if (m < 1) return `±${Math.round(m * 100)} cm`;
+    return `±${Number.isInteger(m) ? m : m.toFixed(1)} m`;
+  }
+
+  // ---------- Estado ----------
+  const state = {
+    geom: null,            // geometría derivada del mensaje config
+    mode: params.get('mode') === 'wifi' ? 'wifi' : 'uwb',
+    showArcs: params.get('arcs') !== '0',
+    sample: null,
+    sampleAt: -Infinity,
+    invalidAt: -Infinity,
+    hasPosition: false,
+    zone: null,
+    signal: null
+  };
+  const anim = {
+    mode: state.mode === 'wifi' ? 1 : 0,   // 0 UWB, 1 WiFi
+    arcs: state.showArcs ? 1 : 0,
+    presence: 1,                            // atenuación del punto sin señal
+    doubt: 0,
+    zoneHud: 0
+  };
+  let trail = [];
+  let trailBroken = true;
+
+  // ---------- Interpolación ----------
+  // Las muestras llegan a 10 Hz y se dibuja a 60 fps. Se muestra la trayectoria con un
+  // retraso fijo de RENDER_DELAY_MS: durante ese tiempo se interpola entre las dos últimas
+  // muestras y, pasado ese tiempo, se extrapola con la última velocidad hasta que llega la
+  // siguiente. La diferencia entre lo mostrado y el modelo nuevo se absorbe sin saltos.
+  class Tracker {
+    constructor() { this.p = null; }
+    reset() { this.p = null; }
+    push(t, p, dt) {
+      if (!this.p || t - this.t > GAP_RESET_MS) {
+        const shown = this.p ? this.at(t) : null;
+        this.v = p.map(() => 0);
+        this.err = shown ? shown.map((s, i) => s - p[i]) : p.map(() => 0);
+      } else {
+        const shown = this.at(t);
+        let v = p.map((c, i) => (c - this.p[i]) / dt);
+        const speed = Math.hypot(...v);
+        if (speed > MAX_SPEED) v = v.map((c) => (c * MAX_SPEED) / speed);
+        this.v = v.map((c, i) => 0.75 * c + 0.25 * this.v[i]);
+        const k = -Math.min(dt, RENDER_DELAY_MS);
+        this.err = shown.map((s, i) => s - (p[i] + this.v[i] * k));
+      }
+      this.p = p.slice();
+      this.t = t;
+      this.dt = dt;
+    }
+    at(t) {
+      const idle = Math.max(0, t - this.t);
+      let k = clamp(idle - RENDER_DELAY_MS, -this.dt, EXTRAP_MAX_MS);
+      // Si dejan de llegar muestras, la extrapolación se retira hacia la última medida
+      if (idle > 250) k *= 1 - smoothstep((idle - 250) / 350);
+      const decay = Math.exp(-idle / ERR_TAU_MS);
+      return this.p.map((c, i) => c + this.v[i] * k + this.err[i] * decay);
+    }
+  }
+  const posTracker = new Tracker();
+  const arcTrackers = { a: new Tracker(), b: new Tracker() };
+
+  // Periodo del ciclo estimado con las llegadas y los saltos de seq; es más estable
+  // que el intervalo entre dos llegadas, que lleva el jitter del transporte.
+  const clock = { period: 100, lastAt: null, lastSeq: null };
+  function cycleInterval(now, seq) {
+    let steps = 1;
+    if (Number.isInteger(seq) && clock.lastSeq !== null) {
+      steps = (seq - clock.lastSeq) & 0xffff;
+      if (steps < 1 || steps > 10) steps = 1;
+    }
+    if (clock.lastAt !== null) {
+      const dt = now - clock.lastAt;
+      if (dt < GAP_RESET_MS * steps) clock.period += 0.1 * (clamp(dt / steps, 20, 500) - clock.period);
+    }
+    clock.lastAt = now;
+    clock.lastSeq = Number.isInteger(seq) ? seq : null;
+    return clamp(clock.period * steps, 20, GAP_RESET_MS);
+  }
+
+  // ---------- Mensajes ----------
+  function handleMessage(text) {
+    let msg;
+    try { msg = JSON.parse(text); } catch (err) { return; }
+    if (!msg || typeof msg !== 'object') return;
+    if (msg.type === 'config') applyConfig(msg);
+    else if (msg.type === 'sample') applySample(msg);
+  }
+
+  function applyConfig(cfg) {
+    const a = cfg.anchors && cfg.anchors.a, b = cfg.anchors && cfg.anchors.b, room = cfg.room;
+    const ok = a && b && room && [a.x, a.y, b.x, b.y, room.x_min_m, room.x_max_m, room.y_min_m, room.y_max_m].every(isNum)
+      && room.x_max_m > room.x_min_m && room.y_max_m > room.y_min_m;
+    if (!ok) { console.warn('Mensaje config no válido', cfg); return; }
+
+    const display = cfg.display || {};
+    const zones = (Array.isArray(cfg.zones) ? cfg.zones : [])
+      .filter((z) => z && [z.x_m, z.y_m, z.width_m, z.height_m].every(isNum))
+      .map((z) => ({ name: String(z.name), x: z.x_m, y: z.y_m, w: z.width_m, h: z.height_m, level: 0 }));
+
+    state.geom = {
+      a: { x: a.x, y: a.y }, b: { x: b.x, y: b.y },
+      room: { x0: room.x_min_m, x1: room.x_max_m, y0: room.y_min_m, y1: room.y_max_m },
+      // El encuadre incluye las anclas aunque queden fuera del rectángulo de la sala
+      bounds: {
+        x0: Math.min(room.x_min_m, a.x, b.x), x1: Math.max(room.x_max_m, a.x, b.x),
+        y0: Math.min(room.y_min_m, a.y, b.y), y1: Math.max(room.y_max_m, a.y, b.y)
+      },
+      zones,
+      uncertainty: isNum(display.uncertainty_m) ? display.uncertainty_m : 0.2,
+      wifiUncertainty: isNum(display.wifi_uncertainty_m) ? display.wifi_uncertainty_m : 3.0,
+      trailMs: (isNum(display.trail_s) ? display.trail_s : 3.0) * 1000,
+      source: typeof cfg.source === 'string' ? cfg.source : ''
+    };
+    resetTrail();
+    posTracker.reset();
+    arcTrackers.a.reset();
+    arcTrackers.b.reset();
+    setText(dom.source, SOURCE_LABELS[state.geom.source] || upper(state.geom.source || '--'));
+    dom.source.classList.toggle('empty', !state.geom.source);
+    updateModeUi();
+    computeView();
+  }
+
+  function applySample(s) {
+    const now = performance.now();
+    const dt = cycleInterval(now, s.seq);
+    state.sample = s;
+    state.sampleAt = now;
+    if (s.valid === false) state.invalidAt = now;
+
+    state.hasPosition = isNum(s.x) && isNum(s.y);
+    if (state.hasPosition) posTracker.push(now, [s.x, s.y], dt);
+    else { posTracker.reset(); trailBroken = true; }
+    if (isNum(s.r_a)) arcTrackers.a.push(now, [s.r_a], dt); else arcTrackers.a.reset();
+    if (isNum(s.r_b)) arcTrackers.b.push(now, [s.r_b], dt); else arcTrackers.b.reset();
+    state.zone = state.hasPosition && typeof s.zone === 'string' && s.zone ? s.zone : null;
+
+    updatePanel(s);
+  }
+
+  // ---------- Panel ----------
+  const dom = {};
+  ['panel', 'rec', 'recText', 'linkRow', 'linkText', 'signalRow', 'signalText', 'btnUwb', 'btnWifi', 'uncValue',
+    'dA', 'dB', 'qA', 'qB', 'qABar', 'qBBar', 'rate', 'latency', 'lost', 'source', 'posX', 'posY',
+    'toast', 'toastText', 'toastDetail', 'toastSave', 'toastClose', 'plan', 'stage'].forEach((id) => { dom[id] = $(id); });
+
+  function setText(el, text) { if (el.textContent !== text) el.textContent = text; }
+  function setValue(el, value, digits) {
+    setText(el, fmt(value, digits));
+    el.classList.toggle('empty', !isNum(value));
+  }
+
+  function updatePanel(s) {
+    setValue(dom.dA, s.d_a, 2);
+    setValue(dom.dB, s.d_b, 2);
+    setValue(dom.qA, s.q_a, 0);
+    setValue(dom.qB, s.q_b, 0);
+    dom.qABar.style.width = `${isNum(s.q_a) ? clamp(s.q_a / 255, 0, 1) * 100 : 0}%`;
+    dom.qBBar.style.width = `${isNum(s.q_b) ? clamp(s.q_b / 255, 0, 1) * 100 : 0}%`;
+    setValue(dom.rate, s.rate_hz, 1);
+    setValue(dom.latency, s.latency_ms, 0);
+    setValue(dom.lost, s.lost, 0);
+    setValue(dom.posX, s.x, 2);
+    setValue(dom.posY, s.y, 2);
+  }
+
+  function setLink(link) {
+    dom.linkRow.dataset.state = link;
+    setText(dom.linkText, LINK_LABELS[link]);
+    dom.linkRow.title = MOCK ? 'Datos sintéticos generados en la página' : WS_URL;
+  }
+
+  function updateSignal(now) {
+    let signal = 'ok';
+    if (!state.sample || now - state.sampleAt > SIGNAL_TIMEOUT_MS) signal = 'lost';
+    else if (!state.hasPosition) signal = 'nopos';
+    else if (now - state.invalidAt < DOUBT_HOLD_MS) signal = 'doubt';
+    if (signal === state.signal) return;
+    state.signal = signal;
+    dom.signalRow.dataset.state = signal;
+    setText(dom.signalText, SIGNAL_LABELS[signal]);
+    dom.panel.classList.toggle('stale', signal === 'lost');
+  }
+
+  function updateModeUi() {
+    const wifi = state.mode === 'wifi';
+    dom.btnUwb.setAttribute('aria-pressed', String(!wifi));
+    dom.btnWifi.setAttribute('aria-pressed', String(wifi));
+    const g = state.geom;
+    setText(dom.uncValue, fmtUncertainty(g ? (wifi ? g.wifiUncertainty : g.uncertainty) : null));
+    dom.uncValue.classList.toggle('empty', !g);
+  }
+
+  function setMode(mode) {
+    state.mode = mode;
+    updateModeUi();
+  }
+
+  let toastTimer = 0;
+  let toastUrl = null;
+  function showToast(text, download, detail = '') {
+    // Un aviso pasajero no sustituye a una grabación que aún no se ha guardado
+    if (!download && toastUrl) return;
+    clearTimeout(toastTimer);
+    if (toastUrl) { URL.revokeObjectURL(toastUrl); toastUrl = null; }
+    setText(dom.toastText, text);
+    setText(dom.toastDetail, detail);
+    dom.toastSave.hidden = !download;
+    dom.toastClose.hidden = !download;
+    if (download) {
+      toastUrl = download.url;
+      dom.toastSave.href = download.url;
+      dom.toastSave.download = download.name;
+      dom.toastSave.textContent = 'Guardar WebM';
+    } else {
+      toastTimer = setTimeout(hideToast, 1600);
+    }
+    dom.toast.hidden = false;
+  }
+  function hideToast() {
+    clearTimeout(toastTimer);
+    dom.toast.hidden = true;
+    if (toastUrl) { URL.revokeObjectURL(toastUrl); toastUrl = null; }
+  }
+
+  // ---------- Conexión ----------
+  let retries = 0;
+  function connect() {
+    setLink(retries === 0 ? 'connecting' : 'retry');
+    let ws;
+    try { ws = new WebSocket(WS_URL); } catch (err) { scheduleReconnect(); return; }
+    ws.onopen = () => { retries = 0; setLink('open'); };
+    ws.onmessage = (ev) => { if (typeof ev.data === 'string') handleMessage(ev.data); };
+    ws.onerror = () => { try { ws.close(); } catch (err) { /* ya cerrado */ } };
+    ws.onclose = () => { ws.onclose = null; scheduleReconnect(); };
+  }
+  function scheduleReconnect() {
+    retries += 1;
+    setLink('retry');
+    setTimeout(connect, Math.min(500 * retries, 2000));
+  }
+
+  // ---------- Lienzo y encuadre ----------
+  const canvas = dom.plan;
+  const ctx = canvas.getContext('2d', { alpha: false });
+  let dpr = 1, width = 0, height = 0, u = 19.2;
+  let view = null;
+
+  function resize() {
+    const rect = dom.stage.getBoundingClientRect();
+    dpr = window.devicePixelRatio || 1;
+    width = Math.max(1, rect.width);
+    height = Math.max(1, rect.height);
+    u = Math.max(11, Math.min(window.innerWidth / 100, window.innerHeight / 56.25));
+    const pw = Math.round(width * dpr), ph = Math.round(height * dpr);
+    if (canvas.width !== pw || canvas.height !== ph) { canvas.width = pw; canvas.height = ph; }
+    computeView();
+    draw(performance.now());
+  }
+
+  function computeView() {
+    const g = state.geom;
+    if (!g) { view = null; return; }
+    const margin = { l: 3.4 * u, r: 1.8 * u, t: 4.9 * u, b: 7.3 * u };
+    const bw = g.bounds.x1 - g.bounds.x0, bh = g.bounds.y1 - g.bounds.y0;
+    const availW = Math.max(10, width - margin.l - margin.r);
+    const availH = Math.max(10, height - margin.t - margin.b);
+    const scale = Math.min(availW / bw, availH / bh);
+    view = {
+      scale,
+      ox: margin.l + (availW - bw * scale) / 2,
+      oy: margin.t + (availH - bh * scale) / 2
+    };
+    // Rectángulo de la sala en pantalla
+    view.x = sx(g.room.x0);
+    view.y = sy(g.room.y0);
+    view.w = (g.room.x1 - g.room.x0) * scale;
+    view.h = (g.room.y1 - g.room.y0) * scale;
+  }
+  const sx = (x) => view.ox + (x - state.geom.bounds.x0) * view.scale;
+  const sy = (y) => view.oy + (y - state.geom.bounds.y0) * view.scale;
+
+  // Coloca una línea de grosor lw sobre la rejilla de píxeles físicos
+  function crisp(v, lw = 1) {
+    const d = Math.max(1, Math.round(lw * dpr));
+    return (Math.round(v * dpr - (d % 2) / 2) + (d % 2) / 2) / dpr;
+  }
+
+  function setFont(size, opts = {}) {
+    ctx.font = `${opts.weight || 600} ${size.toFixed(2)}px ${opts.num ? FONT_NUM : FONT_UI}`;
+    if ('letterSpacing' in ctx) ctx.letterSpacing = `${((opts.spacing || 0) * size).toFixed(2)}px`;
+  }
+  function drawText(text, x, y, size, color, opts = {}) {
+    setFont(size, opts);
+    ctx.fillStyle = color;
+    ctx.textAlign = opts.align || 'left';
+    ctx.textBaseline = opts.baseline || 'alphabetic';
+    ctx.fillText(text, x, y);
+  }
+  function textWidth(text, size, opts = {}) {
+    setFont(size, opts);
+    return ctx.measureText(text).width;
+  }
+  function clipRoom() {
+    ctx.beginPath();
+    ctx.rect(view.x, view.y, view.w, view.h);
+    ctx.clip();
+  }
+
+  // ---------- Dibujo: capa fija ----------
+  function drawWaiting() {
+    const cx = width / 2, cy = height / 2;
+    drawText('ESPERANDO CONFIGURACIÓN', cx, cy - 0.4 * u, 1.5 * u, C.text2, { align: 'center', spacing: 0.14 });
+    drawText(MOCK ? 'modo de prueba' : WS_URL, cx, cy + 1.5 * u, 1.05 * u, C.text3, { align: 'center', num: true, weight: 500 });
+  }
+
+  function drawFloor() {
+    const g = state.geom;
+    ctx.fillStyle = C.floor;
+    ctx.fillRect(view.x, view.y, view.w, view.h);
+
+    ctx.save();
+    clipRoom();
+    ctx.lineWidth = 1;
+    const eps = 1e-6;
+    for (let pass = 0; pass < 2; pass++) {
+      // Primero las líneas de 0.5 m y encima las de metro entero
+      ctx.strokeStyle = pass ? C.gridMajor : C.grid;
+      ctx.beginPath();
+      for (let i = Math.ceil(g.room.x0 / GRID_M - eps); i <= Math.floor(g.room.x1 / GRID_M + eps); i++) {
+        if ((i % 2 === 0) !== Boolean(pass)) continue;
+        const x = crisp(sx(i * GRID_M));
+        ctx.moveTo(x, view.y); ctx.lineTo(x, view.y + view.h);
+      }
+      for (let j = Math.ceil(g.room.y0 / GRID_M - eps); j <= Math.floor(g.room.y1 / GRID_M + eps); j++) {
+        if ((j % 2 === 0) !== Boolean(pass)) continue;
+        const y = crisp(sy(j * GRID_M));
+        ctx.moveTo(view.x, y); ctx.lineTo(view.x + view.w, y);
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawZones() {
+    const pad = 0.55 * u;
+    for (const z of state.geom.zones) {
+      const x = sx(z.x), y = sy(z.y), w = z.w * view.scale, h = z.h * view.scale;
+      const lv = z.level;
+      ctx.fillStyle = lv > 0 ? rgba(C.accent, 0.04 + 0.2 * lv) : 'rgba(205,222,236,0.035)';
+      ctx.fillRect(x, y, w, h);
+
+      ctx.save();
+      if (lv > 0.01) { ctx.shadowColor = rgba(C.accent, 0.8 * lv); ctx.shadowBlur = 1.1 * u * lv; }
+      ctx.lineWidth = lerp(0.08 * u, 0.17 * u, lv);
+      ctx.strokeStyle = mix('#8496a5', C.accent, lv, lerp(0.75, 1, lv));
+      ctx.strokeRect(x, y, w, h);
+      ctx.restore();
+
+      const label = upper(z.name);
+      let size = 1.05 * u;
+      const room = w - 2 * pad;
+      const tw = textWidth(label, size, { spacing: 0.1 });
+      if (tw > room) size = Math.max(0.6 * u, (size * room) / tw);
+      ctx.save();
+      ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip();
+      drawText(label, x + pad, y + pad, size, mix(C.text2, C.text, lv), { baseline: 'top', spacing: 0.1, weight: 650 });
+      ctx.restore();
+    }
+  }
+
+  function drawFrame() {
+    const wallH = 0.7 * u;
+    // Pared de las anclas: banda rayada sobre el borde superior
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(view.x, view.y - wallH, view.w, wallH);
+    ctx.clip();
+    ctx.strokeStyle = C.hatch;
+    ctx.lineWidth = Math.max(1, 0.06 * u);
+    ctx.beginPath();
+    for (let x = view.x - wallH; x < view.x + view.w + wallH; x += 0.5 * u) {
+      ctx.moveTo(x, view.y); ctx.lineTo(x + wallH, view.y - wallH);
+    }
+    ctx.stroke();
+    ctx.restore();
+
+    ctx.strokeStyle = C.border;
+    ctx.lineWidth = Math.max(1, 0.07 * u);
+    ctx.strokeRect(crisp(view.x), crisp(view.y), view.w, view.h);
+
+    ctx.strokeStyle = C.wall;
+    ctx.lineWidth = 0.16 * u;
+    ctx.beginPath();
+    ctx.moveTo(view.x, view.y); ctx.lineTo(view.x + view.w, view.y);
+    ctx.stroke();
+  }
+
+  function niceStep(pxPerM, minPx) {
+    for (const s of [1, 2, 5, 10, 20, 50]) if (s * pxPerM >= minPx) return s;
+    return 100;
+  }
+
+  function drawAxes() {
+    const g = state.geom;
+    const size = 0.95 * u;
+    const step = niceStep(view.scale, 3 * u);
+    const tick = 0.35 * u;
+    const bottom = view.y + view.h, eps = 1e-6;
+    ctx.strokeStyle = C.border;
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    let unitX = view.x - 0.7 * u;
+    for (let i = Math.ceil(g.room.x0 / step - eps); i <= Math.floor(g.room.x1 / step + eps); i++) {
+      const x = crisp(sx(i * step));
+      ctx.moveTo(x, bottom); ctx.lineTo(x, bottom + tick);
+      const text = String(i * step);
+      drawText(text, x, bottom + 0.65 * u, size, C.text2, { align: 'center', baseline: 'top', num: true, weight: 500 });
+      // La unidad se aparta si la primera etiqueta cae sobre la esquina
+      unitX = Math.min(unitX, x - textWidth(text, size, { num: true, weight: 500 }) / 2 - 0.6 * u);
+    }
+    for (let j = Math.ceil(g.room.y0 / step - eps); j <= Math.floor(g.room.y1 / step + eps); j++) {
+      const y = crisp(sy(j * step));
+      ctx.moveTo(view.x, y); ctx.lineTo(view.x - tick, y);
+      drawText(String(j * step), view.x - 0.7 * u, y, size, C.text2, { align: 'right', baseline: 'middle', num: true, weight: 500 });
+    }
+    ctx.stroke();
+    // Unidad común a los dos ejes, en la esquina donde se encuentran
+    drawText('m', unitX, bottom + 0.65 * u, size, C.text3, { align: 'right', baseline: 'top', weight: 500 });
+  }
+
+  function drawAnchors() {
+    const g = state.geom;
+    const wallH = 0.7 * u, box = 2.2 * u;
+    const boxBottom = view.y - wallH - 0.7 * u;
+    const cy = boxBottom - box / 2;
+    const ax = sx(g.a.x), bx = sx(g.b.x);
+
+    // Cota entre las dos anclas
+    const left = Math.min(ax, bx) + box / 2 + 0.6 * u, right = Math.max(ax, bx) - box / 2 - 0.6 * u;
+    if (right - left > 8 * u) {
+      const dist = Math.hypot(g.b.x - g.a.x, g.b.y - g.a.y);
+      const text = `${dist.toFixed(2)} m`;
+      const tw = textWidth(text, 1.05 * u, { num: true, weight: 500 }) + 1.2 * u;
+      const mid = (left + right) / 2, y = crisp(cy);
+      ctx.strokeStyle = C.text3;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(left, y); ctx.lineTo(mid - tw / 2, y);
+      ctx.moveTo(mid + tw / 2, y); ctx.lineTo(right, y);
+      ctx.moveTo(crisp(left), y - 0.4 * u); ctx.lineTo(crisp(left), y + 0.4 * u);
+      ctx.moveTo(crisp(right), y - 0.4 * u); ctx.lineTo(crisp(right), y + 0.4 * u);
+      ctx.stroke();
+      drawText(text, mid, cy, 1.05 * u, C.text2, { align: 'center', baseline: 'middle', num: true, weight: 500 });
+    }
+
+    for (const [name, p, color] of [['A', g.a, C.a], ['B', g.b, C.b]]) {
+      const x = sx(p.x), y = sy(p.y);
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 0.12 * u;
+      ctx.beginPath();
+      ctx.moveTo(x, boxBottom); ctx.lineTo(x, y);
+      ctx.stroke();
+      // Marca del ancla sobre la pared
+      const r = 0.5 * u;
+      ctx.fillStyle = color;
+      ctx.strokeStyle = C.bg;
+      ctx.lineWidth = 0.14 * u;
+      ctx.beginPath();
+      ctx.moveTo(x - r, y); ctx.lineTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r);
+      ctx.closePath();
+      ctx.fill(); ctx.stroke();
+
+      ctx.fillStyle = color;
+      ctx.fillRect(x - box / 2, boxBottom - box, box, box);
+      drawText(name, x, cy + 0.04 * u, 1.5 * u, C.ink, { align: 'center', baseline: 'middle', weight: 750 });
+    }
+  }
+
+  // ---------- Dibujo: capa viva ----------
+  function drawArcs(p) {
+    const g = state.geom;
+    const alpha = anim.arcs * anim.presence;
+    if (alpha < 0.01) return;
+    ctx.save();
+    clipRoom();
+    for (const [key, anchor, color] of [['a', g.a, C.a], ['b', g.b, C.b]]) {
+      const tracker = arcTrackers[key];
+      if (!tracker.p) continue;
+      const r = Math.max(0, tracker.at(frameTime)[0]) * view.scale;
+      const cx = sx(anchor.x), cy = sy(anchor.y);
+      ctx.strokeStyle = rgba(color, 0.62 * alpha);
+      ctx.lineWidth = 0.12 * u;
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.arc(cx, cy, r, 0, TAU);
+      ctx.stroke();
+      if (p && r > 1) {
+        // Radio desde el ancla hacia el punto, con la longitud medida
+        const dx = sx(p[0]) - cx, dy = sy(p[1]) - cy, d = Math.hypot(dx, dy);
+        if (d > 1) {
+          ctx.strokeStyle = rgba(color, 0.3 * alpha);
+          ctx.lineWidth = 0.07 * u;
+          ctx.setLineDash([0.45 * u, 0.45 * u]);
+          ctx.beginPath();
+          ctx.moveTo(cx, cy); ctx.lineTo(cx + (dx / d) * r, cy + (dy / d) * r);
+          ctx.stroke();
+        }
+      }
+    }
+    ctx.restore();
+  }
+
+  function drawTrail(now) {
+    const n = trail.length;
+    if (n < 2) return;
+    const life = state.geom.trailMs, bands = 24;
+    ctx.save();
+    clipRoom();
+    ctx.lineCap = 'butt';
+    ctx.lineJoin = 'round';
+    ctx.strokeStyle = C.accent;
+    // Por tramos de edad: cada tramo es un único trazo, así la opacidad no se acumula
+    let i = 1;
+    while (i < n) {
+      const band = Math.min(bands - 1, Math.floor(((now - trail[i].t) / life) * bands));
+      const f = 1 - (band + 0.5) / bands;
+      ctx.globalAlpha = 0.9 * f * f * anim.presence;
+      ctx.lineWidth = u * (0.1 + 0.34 * f);
+      ctx.beginPath();
+      let open = false;
+      while (i < n && Math.min(bands - 1, Math.floor(((now - trail[i].t) / life) * bands)) === band) {
+        const a = trail[i - 1], b = trail[i];
+        if (b.cut) open = false;
+        else {
+          if (!open) { ctx.moveTo(sx(a.x), sy(a.y)); open = true; }
+          ctx.lineTo(sx(b.x), sy(b.y));
+        }
+        i++;
+      }
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function drawPoint(p) {
+    const g = state.geom;
+    const x = sx(p[0]), y = sy(p[1]);
+    const e = easeInOut(anim.mode);
+    const radius = lerp(g.uncertainty, g.wifiUncertainty, e) * view.scale;
+    const doubt = anim.doubt, presence = anim.presence;
+    const ringColor = doubt > 0.5 ? C.warn : null;
+
+    // Círculo de incertidumbre
+    ctx.save();
+    clipRoom();
+    ctx.globalAlpha = presence;
+    ctx.fillStyle = mix(C.accent, C.wifi, e, lerp(0.16, 0.13, e));
+    ctx.beginPath(); ctx.arc(x, y, radius, 0, TAU); ctx.fill();
+    ctx.strokeStyle = ringColor || mix(C.accent, C.wifi, e, 0.95);
+    ctx.lineWidth = lerp(0.1 * u, 0.16 * u, e);
+    ctx.setLineDash(doubt > 0.5 ? [0.5 * u, 0.4 * u] : []);
+    ctx.beginPath(); ctx.arc(x, y, radius, 0, TAU); ctx.stroke();
+    ctx.restore();
+
+    // Punto
+    const r = 0.46 * u;
+    ctx.save();
+    ctx.fillStyle = C.floor;
+    ctx.beginPath(); ctx.arc(x, y, r + 0.2 * u, 0, TAU); ctx.fill();
+    ctx.globalAlpha = presence;
+    if (doubt > 0.5) {
+      ctx.strokeStyle = C.warn;
+      ctx.lineWidth = 0.2 * u;
+      ctx.beginPath(); ctx.arc(x, y, r - 0.1 * u, 0, TAU); ctx.stroke();
+    } else {
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath(); ctx.arc(x, y, r, 0, TAU); ctx.fill();
+    }
+    ctx.restore();
+
+    // Rótulo junto al punto
+    const lost = state.signal === 'lost';
+    if (lost || doubt > 0.5) {
+      const text = lost ? 'SIN SEÑAL' : 'DUDOSO';
+      const size = 0.95 * u, padX = 0.5 * u, h = 1.6 * u;
+      const tw = textWidth(text, size, { spacing: 0.1, weight: 700 }) + 2 * padX;
+      let bx = x + 1.1 * u, by = y - 1.1 * u - h;
+      if (bx + tw > view.x + view.w) bx = x - 1.1 * u - tw;
+      if (by < view.y) by = y + 1.1 * u;
+      ctx.fillStyle = lost ? C.crit : C.warn;
+      ctx.fillRect(bx, by, tw, h);
+      drawText(text, bx + padX, by + h / 2 + 0.03 * u, size, C.ink, { baseline: 'middle', spacing: 0.1, weight: 700 });
+    }
+  }
+
+  function drawHud() {
+    const g = state.geom;
+    const top = view.y + view.h + 2.55 * u;
+    const capSize = 0.8 * u;
+    const mid = top + capSize + 2.3 * u;
+    const cap = (text, x, align) => drawText(text, x, top, capSize, C.text3, { baseline: 'top', spacing: 0.13, align });
+
+    // La banda ocupa el ancho del plano, o algo más si el plano es estrecho
+    const hudW = Math.max(view.w, Math.min(50 * u, width - 3.6 * u));
+    const x0 = clamp(view.x + view.w / 2 - hudW / 2, 1.8 * u, Math.max(1.8 * u, width - 1.8 * u - hudW));
+
+    // Escala
+    let barM = 0.1;
+    for (const m of [20, 10, 5, 2, 1, 0.5, 0.2]) { if (m * view.scale <= 14 * u) { barM = m; break; } }
+    const barW = barM * view.scale;
+    cap(`ESCALA · CUADRÍCULA ${GRID_M} m`, x0, 'left');
+    const by = crisp(mid + 0.55 * u, 0.12 * u);
+    ctx.strokeStyle = C.text;
+    ctx.lineWidth = 0.12 * u;
+    ctx.beginPath();
+    ctx.moveTo(x0, by); ctx.lineTo(x0 + barW, by);
+    ctx.moveTo(x0 + 0.06 * u, by - 0.5 * u); ctx.lineTo(x0 + 0.06 * u, by + 0.06 * u);
+    ctx.moveTo(x0 + barW - 0.06 * u, by - 0.5 * u); ctx.lineTo(x0 + barW - 0.06 * u, by + 0.06 * u);
+    ctx.stroke();
+    drawText(`${barM} m`, x0 + barW / 2, by - 0.45 * u, 1.15 * u, C.text, { align: 'center', num: true, weight: 600 });
+
+    // Modo
+    const wifi = state.mode === 'wifi';
+    const mx = x0 + Math.max(barW, textWidth(`ESCALA · CUADRÍCULA ${GRID_M} m`, capSize, { spacing: 0.13 })) + 2.4 * u;
+    cap(wifi ? 'MODO · INCERTIDUMBRE SIMULADA' : 'MODO', mx, 'left');
+    const tag = wifi ? 'SIMULACIÓN WiFi' : 'UWB';
+    const tagSize = 1.3 * u, tagH = 2.3 * u;
+    const tagW = textWidth(tag, tagSize, { spacing: 0.08, weight: 750 }) + 1.4 * u;
+    ctx.fillStyle = wifi ? C.wifi : C.accent;
+    ctx.fillRect(mx, mid - tagH / 2, tagW, tagH);
+    drawText(tag, mx + 0.7 * u, mid + 0.04 * u, tagSize, C.ink, { baseline: 'middle', spacing: 0.08, weight: 750 });
+    const unc = fmtUncertainty(wifi ? g.wifiUncertainty : g.uncertainty);
+    drawText(unc, mx + tagW + 0.8 * u, mid + 0.04 * u, 1.5 * u, C.text, { baseline: 'middle', num: true, weight: 600 });
+    const modeEnd = mx + tagW + 0.8 * u + textWidth(unc, 1.5 * u, { num: true, weight: 600 });
+
+    // Zona activa, en grande
+    const rightX = x0 + hudW;
+    cap('ZONA', rightX, 'right');
+    const name = hud.zone;
+    if (name && anim.zoneHud > 0.01) {
+      let size = 2.8 * u;
+      const room = Math.max(4 * u, rightX - modeEnd - 2.5 * u - 1.4 * u);
+      const tw = textWidth(upper(name), size, { weight: 750, spacing: 0.02 });
+      if (tw > room) size *= room / tw;
+      ctx.save();
+      ctx.globalAlpha = anim.zoneHud;
+      drawText(upper(name), rightX, mid, size, C.text, { align: 'right', baseline: 'middle', weight: 750, spacing: 0.02 });
+      const w = textWidth(upper(name), size, { weight: 750, spacing: 0.02 });
+      ctx.fillStyle = C.accent;
+      ctx.fillRect(rightX - w - 1.4 * u, mid - 0.4 * u, 0.8 * u, 0.8 * u);
+      ctx.restore();
+    } else if (!name) {
+      drawText('—', rightX, mid, 2.2 * u, C.text3, { align: 'right', baseline: 'middle', weight: 500 });
+    }
+  }
+
+  // ---------- Bucle de dibujo ----------
+  const hud = { zone: null };
+  let frameTime = 0;
+  let lastFrame = 0;
+
+  function approach(value, target, rate, dt) {
+    const step = dt * rate;
+    return value < target ? Math.min(target, value + step) : Math.max(target, value - step);
+  }
+
+  function draw(now) {
+    frameTime = now;
+    const dt = lastFrame ? clamp(now - lastFrame, 0, 100) : 16;
+    lastFrame = now;
+
+    updateSignal(now);
+    const lost = state.signal === 'lost';
+    const activeZone = lost ? null : state.zone;
+
+    anim.mode = approach(anim.mode, state.mode === 'wifi' ? 1 : 0, 1 / MODE_ANIM_MS, dt);
+    anim.arcs = approach(anim.arcs, state.showArcs ? 1 : 0, 1 / 250, dt);
+    anim.presence = approach(anim.presence, lost ? 0.32 : 1, 1 / 350, dt);
+    anim.doubt = approach(anim.doubt, !lost && now - state.invalidAt < DOUBT_HOLD_MS ? 1 : 0, 1 / 120, dt);
+    if (activeZone !== hud.zone) {
+      // El nombre anterior se apaga antes de mostrar el nuevo
+      anim.zoneHud = approach(anim.zoneHud, 0, 1 / 120, dt);
+      if (anim.zoneHud === 0) hud.zone = activeZone;
+    } else {
+      anim.zoneHud = approach(anim.zoneHud, activeZone ? 1 : 0, 1 / 160, dt);
+    }
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = C.bg;
+    ctx.fillRect(0, 0, width, height);
+    if (!state.geom || !view) { drawWaiting(); return; }
+
+    for (const z of state.geom.zones) z.level = approach(z.level, z.name === activeZone ? 1 : 0, 1 / 180, dt);
+
+    const p = posTracker.p ? posTracker.at(now) : null;
+    if (p && !lost) {
+      // Un hueco entre fotogramas (pestaña en segundo plano) también corta la estela
+      const gap = trail.length > 0 && now - trail[trail.length - 1].t > 500;
+      trail.push({ t: now, x: p[0], y: p[1], cut: trailBroken || gap });
+      trailBroken = false;
+    }
+    const limit = now - state.geom.trailMs;
+    let drop = 0;
+    while (drop < trail.length && trail[drop].t < limit) drop++;
+    if (drop > 0) trail.splice(0, drop);
+
+    drawFloor();
+    drawZones();
+    drawFrame();
+    drawAxes();
+    drawArcs(p);
+    drawTrail(now);
+    if (p) drawPoint(p);
+    drawAnchors();
+    drawHud();
+  }
+
+  function loop(now) {
+    // Cambio de densidad de píxeles, por ejemplo al mover la ventana a otra pantalla
+    if ((window.devicePixelRatio || 1) !== dpr) resize();
+    draw(now);
+    requestAnimationFrame(loop);
+  }
+
+  // ---------- Acciones ----------
+  function resetTrail() {
+    trail = [];
+    trailBroken = true;
+  }
+
+  function toggleFullscreen() {
+    const el = document.documentElement;
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    } else {
+      const request = el.requestFullscreen || el.webkitRequestFullscreen;
+      if (request) Promise.resolve(request.call(el)).catch(() => showToast('No se pudo activar la pantalla completa'));
+    }
+  }
+
+  let recording = null;
+  function toggleRecording() {
+    if (recording) { recording.stop(); return; }
+    if (!canvas.captureStream || typeof MediaRecorder === 'undefined') {
+      showToast('Este navegador no permite grabar el plano');
+      return;
+    }
+    const mime = ['video/webm;codecs=vp9', 'video/webm;codecs=vp8', 'video/webm'].find((m) => MediaRecorder.isTypeSupported(m));
+    if (!mime) { showToast('Este navegador no graba en WebM'); return; }
+
+    const stream = canvas.captureStream(30);
+    const recorder = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: 8000000 });
+    const chunks = [];
+    const startedAt = performance.now();
+    recorder.ondataavailable = (ev) => { if (ev.data && ev.data.size) chunks.push(ev.data); };
+    recorder.onstop = () => {
+      clearTimeout(recording.timer);
+      clearInterval(recording.ticker);
+      recording = null;
+      dom.rec.hidden = true;
+      stream.getTracks().forEach((t) => t.stop());
+      const blob = new Blob(chunks, { type: 'video/webm' });
+      if (!blob.size) { showToast('La grabación ha quedado vacía'); return; }
+      const secs = Math.round((performance.now() - startedAt) / 1000);
+      const d = new Date(), two = (v) => String(v).padStart(2, '0');
+      const stamp = `${d.getFullYear()}${two(d.getMonth() + 1)}${two(d.getDate())}-${two(d.getHours())}${two(d.getMinutes())}${two(d.getSeconds())}`;
+      showToast('Grabación lista', { url: URL.createObjectURL(blob), name: `uwb-plano-${stamp}.webm` },
+        `${secs} s · ${(blob.size / 1048576).toFixed(1)} MB`);
+    };
+    recorder.onerror = () => { showToast('Error durante la grabación'); if (recorder.state !== 'inactive') recorder.stop(); };
+
+    const tick = () => {
+      const left = Math.max(0, Math.ceil((RECORD_MS - (performance.now() - startedAt)) / 1000));
+      setText(dom.recText, `REC ${left} s`);
+    };
+    recording = {
+      stop: () => { if (recorder.state !== 'inactive') recorder.stop(); },
+      timer: setTimeout(() => recording && recording.stop(), RECORD_MS),
+      ticker: setInterval(tick, 200)
+    };
+    hideToast();
+    tick();
+    dom.rec.hidden = false;
+    recorder.start(1000);
+  }
+
+  window.addEventListener('keydown', (ev) => {
+    if (ev.metaKey || ev.ctrlKey || ev.altKey || ev.repeat) return;
+    switch (ev.key.toLowerCase()) {
+      case 'f': toggleFullscreen(); break;
+      case 'r': resetTrail(); showToast('Estela reiniciada'); break;
+      case 'c': state.showArcs = !state.showArcs; showToast(state.showArcs ? 'Arcos visibles' : 'Arcos ocultos'); break;
+      case 'g': toggleRecording(); break;
+      case 'w': setMode(state.mode === 'uwb' ? 'wifi' : 'uwb'); break;
+      case 'escape': if (dom.toast.hidden) return; hideToast(); break;
+      default: return;
+    }
+    ev.preventDefault();
+  });
+  dom.btnUwb.addEventListener('click', () => setMode('uwb'));
+  dom.btnWifi.addEventListener('click', () => setMode('wifi'));
+  dom.toastClose.addEventListener('click', hideToast);
+
+  // ---------- Modo de prueba ----------
+  // Genera un config y un paseo sintético a 10 Hz, y los entrega como texto JSON
+  // por el mismo camino que los mensajes del bridge.
+  function startMock() {
+    const config = {
+      type: 'config', source: 'mock',
+      anchors: { a: { x: 0.0, y: 0.0 }, b: { x: 4.0, y: 0.0 }, height_m: 1.8 },
+      tag: { height_m: 1.2 },
+      room: { x_min_m: -0.5, x_max_m: 4.5, y_min_m: 0.0, y_max_m: 4.0 },
+      zones: [
+        { name: 'mesa', x_m: 0.3, y_m: 1.0, width_m: 1.2, height_m: 0.8 },
+        { name: 'estantería', x_m: 3.0, y_m: 0.6, width_m: 1.0, height_m: 0.6 },
+        { name: 'puerta', x_m: 1.6, y_m: 3.2, width_m: 1.0, height_m: 0.8 }
+      ],
+      display: { uncertainty_m: 0.2, wifi_uncertainty_m: 3.0, trail_s: 3.0 }
+    };
+    const waypoints = [[0.9, 1.4], [0.75, 2.75], [2.1, 3.6], [3.55, 2.9], [3.5, 0.9], [2.1, 0.75]];
+
+    // Curva cerrada de Catmull-Rom por los puntos de paso, tabulada por longitud
+    const path = [];
+    const n = waypoints.length;
+    for (let i = 0; i < n; i++) {
+      const p0 = waypoints[(i + n - 1) % n], p1 = waypoints[i], p2 = waypoints[(i + 1) % n], p3 = waypoints[(i + 2) % n];
+      for (let k = 0; k < 40; k++) {
+        const t = k / 40, t2 = t * t, t3 = t2 * t;
+        path.push([0, 1].map((d) => 0.5 * (2 * p1[d] + (p2[d] - p0[d]) * t
+          + (2 * p0[d] - 5 * p1[d] + 4 * p2[d] - p3[d]) * t2 + (3 * p1[d] - p0[d] - 3 * p2[d] + p3[d]) * t3)));
+      }
+    }
+    const cum = [0];
+    for (let i = 1; i <= path.length; i++) {
+      const a = path[i - 1], b = path[i % path.length];
+      cum.push(cum[i - 1] + Math.hypot(b[0] - a[0], b[1] - a[1]));
+    }
+    const total = cum[cum.length - 1];
+    function pointAt(dist) {
+      const s = ((dist % total) + total) % total;
+      let i = 1;
+      while (cum[i] < s) i++;
+      const a = path[i - 1], b = path[i % path.length];
+      const f = (s - cum[i - 1]) / (cum[i] - cum[i - 1]);
+      return [lerp(a[0], b[0], f), lerp(a[1], b[1], f)];
+    }
+
+    // Generador con semilla fija: el paseo es el mismo en cada carga
+    let seed = 20260927;
+    const rand = () => {
+      seed = (seed + 0x6d2b79f5) | 0;
+      let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+      t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+      return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+    const gauss = () => Math.sqrt(-2 * Math.log(1 - rand())) * Math.cos(TAU * rand());
+
+    const dh = config.anchors.height_m - config.tag.height_m;
+    const span = config.anchors.b.x - config.anchors.a.x;
+    const filtered = { a: null, b: null };
+    const sent = [];
+    let seq = 1200, lost = 0, cycle = 0;
+    const t0 = performance.now();
+
+    handleMessage(JSON.stringify(config));
+
+    setInterval(() => {
+      const now = performance.now();
+      const t = (now - t0) / 1000;
+      cycle += 1;
+      seq = (seq + 1) & 0xffff;
+      if (MOCK_CASE === 'stall' && t > 3) return;
+      if (rand() < 0.012) { lost += 1; return; }
+
+      // Velocidad de paseo con ligeras variaciones, en torno a 0.85 m/s
+      const [tx, ty] = pointAt(0.85 * t - 0.6 * Math.cos(t / 2.5) + 0.6);
+      const blocked = MOCK_CASE === 'invalid' ? true : cycle % 140 >= 134;
+      const raw = {
+        a: Math.hypot(tx - config.anchors.a.x, ty - config.anchors.a.y, dh) + 0.008 * gauss(),
+        b: Math.hypot(tx - config.anchors.b.x, ty - config.anchors.b.y, dh) + 0.008 * gauss()
+      };
+      // Con la medida de A descartada, su distancia filtrada no se actualiza
+      if (filtered.a === null || !blocked) filtered.a = filtered.a === null ? raw.a : filtered.a + 0.4 * (raw.a - filtered.a);
+      filtered.b = filtered.b === null ? raw.b : filtered.b + 0.4 * (raw.b - filtered.b);
+
+      const ra = Math.sqrt(Math.max(filtered.a * filtered.a - dh * dh, 0));
+      const rb = Math.sqrt(Math.max(filtered.b * filtered.b - dh * dh, 0));
+      const x = (ra * ra - rb * rb + span * span) / (2 * span);
+      const y = Math.sqrt(Math.max(ra * ra - x * x, 0));
+      const zone = config.zones.find((z) => x >= z.x_m && x <= z.x_m + z.width_m && y >= z.y_m && y <= z.y_m + z.height_m);
+
+      sent.push(now);
+      while (sent.length && sent[0] < now - 1000) sent.shift();
+      const round = (v, d) => Number(v.toFixed(d));
+      const noPos = MOCK_CASE === 'nopos';
+      handleMessage(JSON.stringify({
+        type: 'sample', seq,
+        x: noPos ? null : round(x, 3), y: noPos ? null : round(y, 3),
+        d_a: noPos ? null : round(filtered.a, 3), d_b: noPos ? null : round(filtered.b, 3),
+        r_a: noPos ? null : round(ra, 3), r_b: noPos ? null : round(rb, 3),
+        q_a: Math.round(clamp((blocked ? 35 : 208) + 6 * gauss(), 0, 255)),
+        q_b: Math.round(clamp(198 + 6 * gauss(), 0, 255)),
+        rate_hz: sent.length > 1 ? round(((sent.length - 1) * 1000) / (now - sent[0]), 1) : null,
+        latency_ms: Math.round(clamp(82 + 7 * gauss(), 40, 200)),
+        lost,
+        zone: noPos || !zone ? null : zone.name,
+        valid: !(blocked || noPos)
+      }));
+    }, 100);
+  }
+
+  // ---------- Arranque ----------
+  updateModeUi();
+  if (typeof ResizeObserver !== 'undefined') new ResizeObserver(resize).observe(dom.stage);
+  window.addEventListener('resize', resize);
+  resize();
+
+  if (MOCK) { setLink('mock'); startMock(); } else { connect(); }
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
